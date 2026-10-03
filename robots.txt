@@ -1,0 +1,12 @@
+# Jasho Works Limited — robots.txt
+# https://www.jashoworks.co.ke/
+
+User-agent: *
+Allow: /
+
+# Block common junk paths
+Disallow: /cgi-bin/
+Disallow: /tmp/
+
+# Sitemap
+Sitemap: https://www.jashoworks.co.ke/sitemap.xml
