@@ -5,56 +5,13 @@
    form interception, FAQ auto-close, back-to-top and
    scroll-reveal are the only JS-dependent behaviours.
 
-   CHANGELOG
-   - initJsClass applies the .js hook that gates every
-     animation rule, with a 2.5s safety net.
-   - data-wa templating rewrites every WhatsApp href from a
-     single number + sign-off.
-   - Lightbox toggles via is-open only; no display flag, so
-     the transition plays.
-   - Form submission uses an anchor click, not window.open.
-   - Form has explicit validation, length caps, live status
-     region and screen-reader announcements.
-
-   CHANGELOG — gallery
-   - G1: live-status count reflects what is actually rendered
-     on mobile (was over-reporting on the limited view).
-   - G2: "show more" toggle is hidden while a filter is
-     active — it had nothing left to reveal.
-   - G3: toggle label and its initial hidden state are
-     derived from the real [data-extra] count.
-   - G4: expand centres the first new card; collapse uses
-     `nearest` so the page doesn't jump.
-   - G5: [data-limit] is the single source of truth for the
-     mobile cutoff; [data-extra] is re-derived at init.
-
-   CHANGELOG — gallery responsiveness (G6–G9)
-   - G6: one isTileVisible() predicate, shared by the filter
-     counter and the lightbox project list. The lightbox
-     used to walk all 12 tiles even when the gallery was
-     collapsed to 6 on mobile — wrong counter, unreachable
-     images, and focus lost on close.
-   - G7: GALLERY_WIDE_MQ + a change listener re-sync the
-     lightbox list and the live status when the 1000px
-     breakpoint flips mid-session.
-   - G8: the toggle's own [hidden] state is the single
-     source of truth; the filter no longer un-hides a
-     button that has no click handler.
-   - G9: expand/collapse fires `gallery:toggled` so the
-     live status is recomputed for screen-reader users.
-
-   CHANGELOG — lightbox
-   - L1: prev/next navigation (buttons, swipe, arrow keys),
-     live counter, and a loading spinner.
-   - L2: explicit zoom — button, double-click / double-tap,
-     native pinch, single-click to unzoom. Escape backs out
-     of zoom before it closes.
-   - L3: swipe-down closes, but is suppressed while zoomed
-     so vertical drags pan the image instead.
-   - L4: background regions inert while open; focus returns
-     to the last-viewed tile on close.
-   - L5: one-per-session hint line under the caption.
-========================================================= */
+   AUDIT UPDATES APPLIED:
+   - initQuoteForm rewritten: no reliance on novalidate.
+     Native reportValidity() runs first, then JS composes
+     the WhatsApp message. Status auto-resets after 30s.
+     Optional analytics event hook fires on success.
+   - pagehide listener clears stale status.
+   ========================================================= */
 
 'use strict';
 
@@ -93,12 +50,6 @@ function trapFocus(container, e) {
 
 /* ---------------------------------------------------------
    GALLERY GEOMETRY — one breakpoint, one predicate
-   The 1000px cutoff lives here and in style.css. Everything
-   that asks "is this tile on screen right now?" must go
-   through isTileVisible(): the filter's live count and the
-   lightbox's prev/next list. If those two ever disagree you
-   get a counter that lies and a viewer that steps through
-   images the user cannot see.
 --------------------------------------------------------- */
 const GALLERY_WIDE_MQ = window.matchMedia('(min-width: 1000px)');
 
@@ -116,10 +67,6 @@ function isTileVisible(li) {
 
 /* ---------------------------------------------------------
    1. JS-CLASS HOOK
-   Sets html.js so the animation rules in style.css activate.
-   The setTimeout is a safety net: if main.js fails to load
-   or throws before initReveal runs, the class is stripped
-   and every [data-reveal] element goes back to full opacity.
 --------------------------------------------------------- */
 (function initJsClass() {
   const root = document.documentElement;
@@ -136,10 +83,6 @@ function isTileVisible(li) {
 
 /* ---------------------------------------------------------
    2. WHATSAPP TEMPLATE
-   Single source of truth for every WhatsApp link. Elements
-   carry a `data-wa` attribute with the message body; the
-   number, sign-off and URL encoding live here. Static hrefs
-   remain in the markup as a no-JS fallback.
 --------------------------------------------------------- */
 const WA_NUMBER = '254702555093';
 const WA_SIGN   = '\n\n— Sent from jashoworks.co.ke';
@@ -156,8 +99,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
 /* ---------------------------------------------------------
    3. MOBILE NAVIGATION
-   Visibility is CSS-driven so links are removed from the
-   tab order when the drawer is closed (WCAG 2.4.3).
 --------------------------------------------------------- */
 (function initMobileNav() {
   const toggle   = document.querySelector('[data-nav-toggle]');
@@ -222,12 +163,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
 /* ---------------------------------------------------------
    5. GALLERY MOBILE LIMIT
-   `data-limit` is the single source of truth for how many
-   projects show before the "show more" toggle appears. Items
-   past the limit get [data-extra], which the CSS hides below
-   1000px. The markup already ships [data-extra] applied so
-   mobile visitors never see a flash of all 12 cards before
-   this runs; the loop just keeps the two in sync.
 --------------------------------------------------------- */
 (function initGalleryLimit() {
   const gallery = document.querySelector('[data-gallery][data-limit]');
@@ -245,17 +180,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
 /* ---------------------------------------------------------
    6. FILTERABLE GALLERY
-   G1: the live-status count reflects what is actually
-       rendered on mobile (was over-reporting on the
-       limited view). Now via the shared isTileVisible().
-   G2: the "show more" toggle is hidden while a filter is
-       active — it had nothing left to reveal.
-   G7: crossing the 1000px breakpoint flips [data-extra]
-       visibility, so the status is recomputed.
-   G8: the toggle's own [hidden] state is the source of
-       truth — a filter never un-hides a dead button.
-   G9: expand/collapse fires `gallery:toggled` so the
-       status is recomputed for screen readers.
 --------------------------------------------------------- */
 (function initGalleryFilter() {
   const filtersEl  = document.querySelector('[data-filters]');
@@ -282,11 +206,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     if (badge) badge.textContent = counts[b.dataset.filter] || 0;
   });
 
-  /* `options.announce === false` suppresses the live-status write.
-     Used for the initial paint only: an aria-live region populated
-     during load can be read aloud by some screen readers, and
-     "Showing 12 of 12 projects" is not an answer to anything the
-     user asked. */
   function apply(filter, options) {
     const announce = !options || options.announce !== false;
     currentFilter = filter;
@@ -299,10 +218,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
     gallery.classList.toggle('is-filtered', filter !== 'all');
 
-    // While a filter is active every match is already on screen, so the
-    // "show more" toggle has nothing left to reveal — hide it. It also
-    // stays hidden if initGalleryToggle found nothing to reveal and
-    // removed the button itself.
     if (toggleWrap) {
       const toggleUsable = toggle && !toggle.hidden;
       toggleWrap.hidden = (filter !== 'all') || !toggleUsable;
@@ -324,31 +239,15 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     btn.addEventListener('click', () => apply(btn.dataset.filter));
   });
 
-  // Expanding/collapsing changes what is rendered, so the status has
-  // to be recomputed even though the filter itself didn't change.
   gallery.addEventListener('gallery:toggled', () => apply(currentFilter));
-
-  // Crossing 1000px flips [data-extra] visibility. Without this the
-  // status keeps reporting the count from the other side of the
-  // breakpoint until the user happens to click a filter.
   GALLERY_WIDE_MQ.addEventListener('change', () => apply(currentFilter));
 
-  // Initial paint, minus the announcement.
   apply('all', { announce: false });
 })();
 
 
 /* ---------------------------------------------------------
    7. GALLERY "SHOW MORE" TOGGLE (mobile only)
-   G3: the label and the wrap's hidden state are derived from
-       the real [data-extra] count.
-   G4: expanding centres the first new card; collapsing uses
-       `nearest` so the page doesn't jump to the top of the
-       section. Both respect the page's `scroll-behavior`,
-       which is `auto` under prefers-reduced-motion.
-   G8: when there is nothing to reveal, the button itself is
-       hidden — not just its wrapper — so the filter's
-       `toggleUsable` check has something honest to read.
 --------------------------------------------------------- */
 (function initGalleryToggle() {
   const gallery = document.querySelector('[data-gallery]');
@@ -361,9 +260,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
   const collapsedLabel = 'Show ' + extraCount + ' more projects';
   const expandedLabel  = 'Show fewer projects';
 
-  // Nothing to reveal → the toggle would be a no-op. Hide the button
-  // itself as well as the wrapper so initGalleryFilter can tell the
-  // difference between "hidden by a filter" and "never existed".
   if (extraCount === 0) {
     toggle.hidden = true;
     if (toggleWrap) toggleWrap.hidden = true;
@@ -379,8 +275,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
     toggle.textContent = expanded ? expandedLabel : collapsedLabel;
 
-    // Let the filter recompute the live status — the set of rendered
-    // tiles just changed, so the previously announced count is stale.
     gallery.dispatchEvent(new CustomEvent('gallery:toggled'));
 
     if (expanded) {
@@ -395,30 +289,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
 /* ---------------------------------------------------------
    8. LIGHTBOX
-   Full flow: click → view → zoom → exit.
-
-   - Click: every .project tile is a <button>; a descriptive
-     aria-label is derived once at init.
-   - View: prev/next navigation (buttons, swipe, ←/→ keys),
-     a live "n / total" counter, and a loading spinner.
-     The navigation list is recomputed on open, so it respects
-     the active filter.
-   - Zoom: explicit button, double-click / double-tap, plus
-     native pinch. Single-click on a zoomed image zooms back
-     out. Escape unzooms before it closes.
-   - Exit: close button, click-backdrop, Escape, swipe-down.
-     Swipe-down is suppressed while zoomed. Focus returns to
-     the last-viewed tile.
-   - First-visit hint: one line under the caption, shown once
-     per session, device-aware.
-
-   G6: the project list is filtered through the shared
-       isTileVisible(), so a collapsed mobile gallery gives
-       a 6-item viewer, not a 12-item one. Counter, arrow
-       keys, swipe and focus-return all agree with what is
-       on screen.
-   G7: crossing the 1000px breakpoint while the viewer is
-       open rebuilds the list and keeps the current image.
 --------------------------------------------------------- */
 (function initLightbox() {
   const lightbox  = document.querySelector('[data-lightbox]');
@@ -435,7 +305,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
   const HINT_KEY = 'jasho-lb-hint-seen';
 
-  /* --- Give every tile a proper accessible name ----------- */
   document.querySelectorAll('.project').forEach((btn) => {
     if (btn.hasAttribute('aria-label')) return;
     const title = btn.querySelector('.project__title');
@@ -448,7 +317,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     );
   });
 
-  /* --- Background regions made inert while open ----------- */
   const backgroundRegions = [
     document.querySelector('.site-header'),
     document.querySelector('main'),
@@ -464,10 +332,9 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     });
   }
 
-  /* --- State ---------------------------------------------- */
-  let projects    = [];   // visible .project buttons, in DOM order
-  let index       = 0;    // which one is on screen
-  let lastFocused = null; // element to restore focus to on close
+  let projects    = [];
+  let index       = 0;
+  let lastFocused = null;
   let touchStartX = 0;
   let touchStartY = 0;
   let lastSwipeAt = 0;
@@ -477,15 +344,11 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
   const isOpen   = () => lightbox.classList.contains('is-open');
   const isZoomed = () => lightbox.classList.contains('is-zoomed');
 
-  /* G6: the single source of truth for what the viewer may step
-     through. A tile hidden by the mobile limit — not just by a
-     filter — must not appear in the list. */
   function getVisibleProjects() {
     return Array.from(document.querySelectorAll('.project'))
       .filter((btn) => isTileVisible(btn.closest('li')));
   }
 
-  /* --- Zoom ----------------------------------------------- */
   function setZoom(on) {
     lightbox.classList.toggle('is-zoomed', on);
     if (zoomBtn) {
@@ -495,7 +358,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     if (!on) stage.scrollTo(0, 0);
   }
 
-  /* --- Load an image into the viewer ---------------------- */
   function load(i) {
     const btn = projects[i];
     if (!btn) return;
@@ -524,7 +386,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     load(index);
   }
 
-  /* --- First-visit hint ----------------------------------- */
   function hintText() {
     const fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
     return fine
@@ -551,7 +412,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
     hintEl.textContent = hintText();
     hintEl.hidden = false;
-    // Next frame so the opacity transition runs from 0 → 1.
     requestAnimationFrame(() => hintEl.classList.add('is-visible'));
 
     window.clearTimeout(hintTimer);
@@ -560,7 +420,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     try { sessionStorage.setItem(HINT_KEY, '1'); } catch (_) {}
   }
 
-  /* --- Open / close --------------------------------------- */
   function open(btn) {
     projects = getVisibleProjects();
     index = Math.max(0, projects.indexOf(btn));
@@ -588,9 +447,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
     hideHint();
 
-    // Clear the src after the fade so a stale image isn't kept
-    // around, and so a screen reader on the page underneath
-    // doesn't run into it.
     window.setTimeout(() => {
       if (!isOpen()) {
         imgEl.removeAttribute('src');
@@ -599,7 +455,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     }, 260);
   }
 
-  /* --- Wiring --------------------------------------------- */
   document.querySelectorAll('.project').forEach((btn) => {
     btn.addEventListener('click', () => open(btn));
   });
@@ -609,27 +464,20 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
   if (nextBtn) nextBtn.addEventListener('click', () => navigate(1));
   if (zoomBtn) zoomBtn.addEventListener('click', () => setZoom(!isZoomed()));
 
-  /* Click on empty backdrop (or empty stage area) closes.
-     Ignored for 400ms after a swipe so the touchend-synthesised
-     click doesn't accidentally close the viewer. */
   lightbox.addEventListener('click', (e) => {
     if (Date.now() - lastSwipeAt < 400) return;
     if (e.target === lightbox || e.target === stage) close();
   });
 
-  /* Click on a zoomed image zooms out. */
   imgEl.addEventListener('click', () => {
     if (isZoomed()) setZoom(false);
   });
 
-  /* Double-click on desktop zooms in. */
   imgEl.addEventListener('dblclick', (e) => {
     e.preventDefault();
     setZoom(!isZoomed());
   });
 
-  /* Double-tap on touch zooms in. Single tap on a zoomed image
-     zooms out (handled by the click listener above). */
   imgEl.addEventListener('touchend', (e) => {
     const now = Date.now();
     if (now - lastTapAt < 300) {
@@ -641,7 +489,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     }
   }, { passive: false });
 
-  /* --- Swipe gestures ------------------------------------- */
   lightbox.addEventListener('touchstart', (e) => {
     const t = e.changedTouches[0];
     touchStartX = t.clientX;
@@ -649,7 +496,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
   }, { passive: true });
 
   lightbox.addEventListener('touchend', (e) => {
-    // While zoomed the image is the scroll target — let it pan.
     if (isZoomed()) return;
 
     const t  = e.changedTouches[0];
@@ -658,20 +504,18 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     const ax = Math.abs(dx);
     const ay = Math.abs(dy);
 
-    if (ax < 60 && ay < 60) return; // tap, not swipe
+    if (ax < 60 && ay < 60) return;
 
     lastSwipeAt = Date.now();
 
-    if (ay > ax && dy > 90) { close(); return; }            // swipe down → close
-    if (ax > ay && ax > 60) { navigate(dx < 0 ? 1 : -1); }  // swipe L/R → nav
+    if (ay > ax && dy > 90) { close(); return; }
+    if (ax > ay && ax > 60) { navigate(dx < 0 ? 1 : -1); }
   }, { passive: true });
 
-  /* --- Keyboard ------------------------------------------- */
   document.addEventListener('keydown', (e) => {
     if (!isOpen()) return;
 
     if (e.key === 'Escape') {
-      // First Escape backs out of zoom, a second closes.
       if (isZoomed()) setZoom(false);
       else close();
       return;
@@ -684,7 +528,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     trapFocus(lightbox, e);
   });
 
-  /* --- Loading / error states ----------------------------- */
   imgEl.addEventListener('load', () => {
     lightbox.classList.remove('is-loading');
   });
@@ -693,12 +536,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     if (captionEl) captionEl.textContent = 'Sorry, this image could not be loaded.';
   });
 
-  /* --- G7: re-sync when the 1000px breakpoint flips --------
-     A tablet rotated to landscape mid-view suddenly has 12 tiles
-     instead of 6 (or the reverse). Rebuild the list and hold the
-     user's place. `load()` is skipped when the list length is
-     unchanged, so resizing within the same side of the breakpoint
-     doesn't reload the image. */
   GALLERY_WIDE_MQ.addEventListener('change', () => {
     if (!isOpen()) return;
 
@@ -716,25 +553,34 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
 
 /* ---------------------------------------------------------
-   9. QUOTE FORM
-   - Trims, collapses whitespace and length-caps each field
-     before composing the WhatsApp message.
-   - Uses an anchor click rather than window.open() so popup
-     blockers don't eat it.
-   - Reports validation errors and success in a live status
-     region instead of silently doing nothing.
+   9. QUOTE FORM (audit-updated)
+   - No novalidate: native constraint validation runs first
+     via form.reportValidity().
+   - :user-invalid CSS handles the visual error state after
+     user interaction.
+   - JS still composes the WhatsApp message and handles status.
+   - Status auto-resets after 30s and on pagehide.
+   - Fires an optional analytics hook (no-op if not loaded).
 --------------------------------------------------------- */
 (function initQuoteForm() {
   const form = document.querySelector('[data-quote-form]');
   if (!form) return;
 
   const status = form.querySelector('[data-quote-status]');
+  let statusTimer = null;
 
   function setStatus(message, state) {
     if (!status) return;
     status.textContent = message || '';
     if (state) status.dataset.state = state;
     else status.removeAttribute('data-state');
+
+    window.clearTimeout(statusTimer);
+    if (message && state === 'success') {
+      statusTimer = window.setTimeout(() => {
+        if (status.textContent === message) setStatus('');
+      }, 30000);
+    }
   }
 
   function clean(value, max) {
@@ -747,11 +593,20 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
   form.addEventListener('submit', (e) => {
     e.preventDefault();
 
+    // Native constraint validation first — gives the user the browser's
+    // own error UI without needing a custom one.
+    if (typeof form.reportValidity === 'function' && !form.checkValidity()) {
+      form.reportValidity();
+      setStatus('Please fill in your name, project location and project type.', 'error');
+      return;
+    }
+
     const data     = new FormData(form);
     const name     = clean(data.get('name'), 80);
     const location = clean(data.get('location'), 120);
     const type     = clean(data.get('project_type'), 60);
 
+    // Fallback check (covers browsers where checkValidity is missing).
     if (!name || !location || !type) {
       const missing = !name ? 'name' : (!location ? 'location' : 'project_type');
       setStatus('Please fill in your name, project location and project type.', 'error');
@@ -767,8 +622,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
       'Location: ' + location + '\n' +
       'Project type: ' + type;
 
-    // Anchor click instead of window.open: never blocked, keeps the
-    // user gesture intact, and works in every browser.
     const link = document.createElement('a');
     link.href = buildWhatsAppLink(message);
     link.target = '_blank';
@@ -778,7 +631,21 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     link.remove();
 
     setStatus('Opening WhatsApp… if nothing happens, call 0702 555 093.', 'success');
+
+    // Analytics hook — no-op if no analytics script is loaded.
+    try {
+      if (typeof window.plausible === 'function') {
+        window.plausible('Quote Submitted', { props: { type: type } });
+      } else if (typeof window.fathom === 'object' && window.fathom.trackEvent) {
+        window.fathom.trackEvent('Quote Submitted');
+      } else if (typeof window.umami === 'object' && window.umami.track) {
+        window.umami.track('Quote Submitted', { type: type });
+      }
+    } catch (_) {}
   });
+
+  // Clear stale success messages on back-navigation.
+  window.addEventListener('pagehide', () => setStatus(''));
 })();
 
 
@@ -800,7 +667,7 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
 
 /* ---------------------------------------------------------
-   11. BACK TO TOP — visible after a short scroll
+   11. BACK TO TOP
 --------------------------------------------------------- */
 (function initBackToTop() {
   const btn = document.querySelector('[data-to-top]');
@@ -819,13 +686,8 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
 /* ---------------------------------------------------------
    12. SCROLL REVEAL
-   Auto-applies [data-reveal] to key blocks. Staggers grid
-   children. Uses `translate` (not `transform`) so component
-   hover transforms keep working. Respects reduced motion.
 --------------------------------------------------------- */
 (function initReveal() {
-  // Mark ready before the early-return so the initJsClass safety
-  // net knows this script reached the end successfully.
   window.__jashoRevealReady = true;
 
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -835,10 +697,15 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     '.proof-bar__badge', '.proof-bar__quote', '.proof-bar__stat',
     '.card', '.why-card', '.cost-card', '.area', '.step', '.quote',
     '.split__media', '.split__body',
+    '.case', '.case__media', '.case__body',
+    '.team__member',
     '.cta-box > div'
   ];
 
-  const GRIDS = ['.grid--cards', '.why-grid', '.cost-grid', '.areas-grid', '.process', '.quotes'];
+  const GRIDS = [
+    '.grid--cards', '.why-grid', '.cost-grid', '.areas-grid',
+    '.process', '.quotes', '.team__grid'
+  ];
 
   const els = [];
   SELECTORS.forEach((sel) => {
@@ -849,7 +716,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     });
   });
 
-  // Stagger grid children
   GRIDS.forEach((sel) => {
     document.querySelectorAll(sel).forEach((grid) => {
       Array.from(grid.children).forEach((child, i) => {

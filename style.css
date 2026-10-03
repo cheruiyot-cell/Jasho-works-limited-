@@ -2,56 +2,28 @@
    JASHO WORKS LIMITED — MASTER STYLESHEET
    Organised in 6 sections:
      1. Reset & base
-     2. Design tokens (custom properties)
+     2. Design tokens
      3. Layout primitives
      4. Components
-     5. Page sections (header, hero, footer, etc.)
+     5. Page sections
      6. Utilities & motion preferences
 
-   CHANGELOG — audit + interaction fixes
-   - FIX §1.1: added .hero__bg / .hero__scrim
-   - FIX §1.2: removed the two-column .hero__inner grid
-   - FIX §1.5: removed .gallery-toggle[aria-expanded="true"] { display: none }
-   - FIX §3.1: restored :focus-visible outline on form fields
-   - FIX §3.2: removed dead .hero__media / .btn--outline rules
-   - FIX §3.3: lightbox animates via opacity/visibility (no dead state)
-   - FIX §3.5: wrapped backdrop-filter in @supports
-   - ADD: .quote-form__status and .quote-form__noscript styles
-   - ADD: .faq--spaced and .footer-bottom--flush (used by privacy.html)
-
-   CHANGELOG — gallery
-   - G1: [data-extra] hiding is scoped to mobile only; .is-filtered
-     override is now inside the same breakpoint, so desktop is unaffected
-   - G2: [data-limit] is now the single source of truth (main.js
-     re-derives [data-extra] from it at init)
-   - G3: .project uses cursor: zoom-in
-
-   CHANGELOG — gallery responsiveness (G6–G9)
-   - G6: the 2-column breakpoint moves 420px → 560px. At 420px each
-     tile was 186 × 139px, which left ~5px of headroom for the meta
-     strip once the 1.1rem padding, category badge, 2-line title and
-     location were stacked up. 560px restores ~50px of slack.
-   - G6b: .project__title is clamped to 2 lines as belt-and-braces —
-     a 3-line title would push the badge past .project's overflow
-     edge with no scroll and no ellipsis.
-   - G8: .no-js reveals [data-extra] tiles. Without JS there is no
-     "show more" button, so half the portfolio would otherwise be
-     permanently unreachable on mobile.
-   - G9: .lightbox__stage gets an explicit touch-action so a
-     swipe-down that starts on the stage letterbox — rather than on
-     the photo — still reaches touchend instead of being claimed by
-     the browser as a scroll. Overridden while zoomed, or vertical
-     panning would break.
-
-   CHANGELOG — lightbox
-   - L1: added prev/next, zoom, counter, spinner, stage
-   - L2: stage uses overflow: auto + image margin: auto (both edges
-     reachable when zoomed)
-   - L3: zoom state toggles .is-zoomed on the dialog; image becomes
-     200% width and scrolls
-   - L4: control buttons get :active feedback and safe-area insets
-   - L5: [hidden] on nav buttons must win — explicit display: none
-   - L6: added .lightbox__meta + .lightbox__hint for the first-visit tip
+   AUDIT UPDATES APPLIED:
+   - &fm=webp handled at HTML level (assets)
+   - Removed reliance on novalidate; added :user-invalid styling
+   - Required-field asterisk styles
+   - Mobile padding for sticky CTAs
+   - Hero jump-to-costs link
+   - Hero scrim rebalanced on mobile
+   - Compact FAQ inside cost section
+   - Email fallback under form
+   - Static map block
+   - Case studies section
+   - Linked area tiles
+   - Team section
+   - Lightbox nav 48px on small screens
+   - Breadcrumbs (county pages)
+   - County hero variant
    ========================================================================= */
 
 
@@ -103,7 +75,6 @@ address { font-style: normal; }
    ========================================================================= */
 
 :root {
-  /* Colors */
   --ink:        #16130f;
   --ink-soft:   #5c554c;
   --ink-mute:   #6e665c;
@@ -112,30 +83,25 @@ address { font-style: normal; }
   --surface-2:  #efe9df;
   --line:       #e7e1d8;
 
-  /* Accent */
   --accent:        #e0592a;
   --accent-dark:   #a63a14;
   --accent-text:   #bf4318;
   --accent-strong: #bf4318;
   --accent-soft:   #fbe6dc;
 
-  /* WhatsApp — dark text on brand green (6.16:1) */
   --wa:            #25d366;
   --wa-dark:       #1da851;
   --wa-ink:        #0b3d2e;
 
-  /* Layout */
   --container: 1200px;
   --header-h:  5.5rem;
 
-  /* Radii */
   --radius-xs:   6px;
   --radius-sm:   8px;
   --radius-md:   14px;
   --radius-lg:   22px;
   --radius-pill: 999px;
 
-  /* Spacing */
   --space-sm:  .75rem;
   --space-md:  1rem;
   --space-lg:  1.5rem;
@@ -143,11 +109,9 @@ address { font-style: normal; }
   --space-2xl: 4rem;
   --space-3xl: 6rem;
 
-  /* Shadows */
   --shadow-md: 0 6px 18px rgba(22,19,15,.08), 0 2px 6px rgba(22,19,15,.04);
   --shadow-lg: 0 20px 48px rgba(22,19,15,.14);
 
-  /* Typography */
   --font: 'Plus Jakarta Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
   --step--1: clamp(.875rem, .85rem + .12vw, .95rem);
@@ -158,7 +122,6 @@ address { font-style: normal; }
   --step-4:  clamp(2rem, 1.5rem + 2.8vw, 3.2rem);
   --step-5:  clamp(2.25rem, 1.6rem + 4vw, 4.2rem);
 
-  /* Motion */
   --ease: cubic-bezier(.22, 1, .36, 1);
 }
 
@@ -327,6 +290,24 @@ address { font-style: normal; }
 .area h3 { font-size: 1rem; font-weight: 700; }
 .area p  { font-size: .875rem; color: var(--ink-mute); margin-top: .2rem; }
 
+/* Linked area tiles (audit update) */
+.area--link {
+  display: flex; flex-direction: column; gap: .35rem;
+  color: inherit;
+  transition: transform .25s var(--ease), border-color .25s, box-shadow .25s;
+}
+.area--link:hover {
+  transform: translateY(-3px);
+  border-color: var(--accent);
+  box-shadow: var(--shadow-md);
+}
+.area--link:hover .area__cta { color: var(--accent-dark); }
+.area__cta {
+  font-size: .8125rem; font-weight: 700;
+  color: var(--accent-text); margin-top: .35rem;
+  transition: color .2s;
+}
+
 /* ---------- Filters ---------- */
 .filters { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: var(--space-xl); }
 .filter-btn {
@@ -342,39 +323,16 @@ address { font-style: normal; }
 
 /* ---------- Gallery ---------- */
 .gallery { display: grid; gap: var(--space-md); grid-template-columns: 1fr; }
-
-/* G6: was 420px. At 420px each tile is 186 × 139px, and the meta
-   strip — 1.1rem padding × 2, the category badge, a 2-line title and
-   the location — measures ~134px. That left ~5px of headroom, so a
-   title wrapping to three lines clipped the badge off the top edge
-   of .project with no scroll and no ellipsis. 560px restores ~50px. */
 @media (min-width: 560px) { .gallery { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1000px){ .gallery { grid-template-columns: repeat(3, 1fr); } }
 
-/* Mobile: hide "extra" projects until the toggle (or a filter) reveals
-   them. `data-limit` is read by main.js and re-derives [data-extra] at
-   init; the attribute is also present in the markup so mobile visitors
-   never see a flash of all cards before the script runs. */
 .gallery[data-limit] > li[data-extra] { display: none; }
 .gallery.is-expanded > li[data-extra] { display: block; }
-
-/* G8: without JS there is no "show more" button, so hiding half the
-   portfolio behind a control that cannot exist would be worse than the
-   layout shift the rule above guards against. main.js strips .no-js as
-   its first action, so this only applies when the script isn't running. */
 .no-js .gallery[data-limit] > li[data-extra] { display: block; }
-
-/* Desktop: no limit — every project is always on screen. */
 @media (min-width: 1000px) {
   .gallery[data-limit] > li[data-extra] { display: block; }
 }
-
 .gallery > li.is-hidden { display: none !important; }
-
-/* Mobile only. While a filter is active the gallery shows every match,
-   so [data-extra] cards have to come back on screen. On desktop the
-   media query above already shows them, so scoping here keeps that
-   rule single-purpose. */
 @media (max-width: 999px) {
   .gallery.is-filtered > li[data-extra] { display: block; }
 }
@@ -400,10 +358,6 @@ address { font-style: normal; }
   color: var(--accent-dark); background: rgba(255,255,255,.95);
   padding: .25rem .55rem; border-radius: var(--radius-xs); margin-bottom: .5rem;
 }
-
-/* G6b: clamped as belt-and-braces. At the narrowest 2-column tile a
-   3-line title would push the category badge past .project's
-   overflow: hidden edge — clipped, with no scrollbar and no ellipsis. */
 .project__title {
   font-size: 1.02rem; font-weight: 700; line-height: 1.25;
   display: -webkit-box;
@@ -429,14 +383,6 @@ address { font-style: normal; }
 }
 .lightbox.is-open { opacity: 1; visibility: visible; }
 
-/* Stage clips + scrolls the image. `margin: auto` on the child (rather
-   than place-items) so both edges stay reachable when the image
-   overflows while zoomed.
-
-   G9: touch-action is declared because without it a swipe-down that
-   starts on the stage letterbox — rather than on the photo — is
-   claimed by the browser as a scroll and never reaches touchend, so
-   the viewer silently refuses to close. */
 .lightbox__stage {
   max-width: min(100%, 1100px);
   max-height: 85vh;
@@ -449,8 +395,6 @@ address { font-style: normal; }
   touch-action: pan-x pinch-zoom;
 }
 
-/* G9: zoomed, the image overflows on both axes, so both axes must be
-   pannable or vertical panning breaks. */
 .lightbox.is-zoomed .lightbox__stage {
   touch-action: pan-x pan-y pinch-zoom;
 }
@@ -467,15 +411,10 @@ address { font-style: normal; }
   cursor: zoom-in;
   user-select: none;
   -webkit-user-drag: none;
-  /* Not zoomed: horizontal swipe pans, and vertical drags fall through
-     to JS (swipe-down to close). Pinch-zoom always native. */
   touch-action: pan-x pinch-zoom;
   transition: border-radius .2s, box-shadow .2s;
 }
 
-/* Zoomed: the image is 2× the stage width and native scrolling does the
-   panning. All directions allowed; swipe-to-close is suppressed in JS
-   while .is-zoomed is on. */
 .lightbox.is-zoomed .lightbox__img {
   max-width: none;
   max-height: none;
@@ -486,7 +425,6 @@ address { font-style: normal; }
   touch-action: pan-x pan-y pinch-zoom;
 }
 
-/* ---- Controls ---- */
 .lightbox__close,
 .lightbox__nav,
 .lightbox__zoom {
@@ -512,7 +450,6 @@ address { font-style: normal; }
 .lightbox__nav { top: 50%; translate: 0 -50%; }
 .lightbox__nav--prev { left: 1rem; }
 .lightbox__nav--next { right: 1rem; }
-/* [hidden] must win over `display: grid` above. */
 .lightbox__nav[hidden] { display: none; }
 
 .lightbox__zoom svg { width: 20px; height: 20px; grid-area: 1 / 1; }
@@ -520,13 +457,12 @@ address { font-style: normal; }
 .lightbox__zoom[aria-pressed="true"] .lightbox__zoom-in  { display: none; }
 .lightbox__zoom[aria-pressed="true"] .lightbox__zoom-out { display: block; }
 
+/* AUDIT FIX: keep nav at 48px on all screens */
 @media (max-width: 560px) {
-  .lightbox__nav { width: 42px; height: 42px; }
   .lightbox__nav--prev { left: .5rem; }
   .lightbox__nav--next { right: .5rem; }
 }
 
-/* ---- Meta strip: hint + caption ---- */
 .lightbox__meta {
   position: absolute;
   bottom: calc(1rem + env(safe-area-inset-bottom));
@@ -554,7 +490,6 @@ address { font-style: normal; }
 }
 .lightbox__hint.is-visible { opacity: 1; }
 
-/* ---- Counter ---- */
 .lightbox__counter {
   position: absolute;
   top: calc(1rem + env(safe-area-inset-top));
@@ -567,7 +502,6 @@ address { font-style: normal; }
   z-index: 2;
 }
 
-/* ---- Loading spinner ---- */
 .lightbox__spinner {
   position: absolute; top: 50%; left: 50%;
   width: 40px; height: 40px; margin: -20px 0 0 -20px;
@@ -634,6 +568,18 @@ address { font-style: normal; }
 .faq summary:hover { background: var(--surface); }
 .faq details p { padding: 0 1.25rem 1.15rem; color: var(--ink-soft); font-size: .95rem; }
 
+/* Compact FAQ inside the cost section (audit update) */
+.faq--compact {
+  margin-top: var(--space-xl);
+  padding-top: var(--space-xl);
+  border-top: 1px solid var(--line);
+}
+.faq__heading {
+  font-size: 1rem; font-weight: 800;
+  color: var(--ink); margin-bottom: var(--space-md);
+  letter-spacing: -.01em;
+}
+
 /* ---------- CTA info items ---------- */
 .cta-info { display: flex; flex-direction: column; gap: 1rem; position: relative; z-index: 1; }
 .cta-info__item {
@@ -649,6 +595,40 @@ address { font-style: normal; }
 .cta-info__value { font-size: 1rem; font-weight: 600; margin-top: .15rem; }
 .cta-info__value a:hover { color: var(--accent); text-decoration: underline; }
 
+/* ---------- Static map block (audit update) ---------- */
+.cta-map {
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: var(--radius-md);
+  padding: .75rem;
+  display: flex; flex-direction: column; gap: .6rem;
+}
+.cta-map__placeholder {
+  aspect-ratio: 16 / 9;
+  border-radius: var(--radius-sm);
+  background:
+    repeating-linear-gradient(45deg, rgba(255,255,255,.04) 0 12px, transparent 12px 24px),
+    linear-gradient(135deg, #2a241d 0%, #3d342b 100%);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  gap: .5rem;
+  color: rgba(255,255,255,.65);
+  font-size: .875rem; font-weight: 600;
+  letter-spacing: .05em; text-transform: uppercase;
+}
+.cta-map__placeholder svg { width: 32px; height: 32px; color: var(--accent); }
+.cta-map__link {
+  width: 100%; font-size: .875rem; min-height: 44px;
+  background: rgba(255,255,255,.08);
+  border-color: rgba(255,255,255,.22);
+  color: #fff;
+}
+.cta-map__link:hover {
+  background: rgba(255,255,255,.14);
+  border-color: rgba(255,255,255,.36);
+  color: #fff;
+}
+
 /* ---------- Quote form ---------- */
 .quote-form {
   margin-top: var(--space-xl); padding-top: var(--space-xl);
@@ -662,7 +642,7 @@ address { font-style: normal; }
   font-size: 16px; padding: .85rem 1rem; min-height: 48px;
   border-radius: var(--radius-sm); border: 1px solid rgba(255,255,255,.18);
   background: rgba(255,255,255,.06); color: #fff; width: 100%;
-  transition: border-color .2s, background .2s;
+  transition: border-color .2s, background .2s, box-shadow .2s;
 }
 .field input::placeholder { color: rgba(255,255,255,.45); }
 
@@ -685,6 +665,18 @@ address { font-style: normal; }
   }
 }
 
+/* AUDIT FIX: :user-invalid styles (only fires after user interaction) */
+.field input:user-invalid,
+.field select:user-invalid {
+  border-color: #ff8a65;
+  background: rgba(255,138,101,.06);
+}
+.field input:user-invalid:focus,
+.field select:user-invalid:focus {
+  border-color: #ff8a65;
+  box-shadow: 0 0 0 3px rgba(255,138,101,.18);
+}
+
 .field select {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
@@ -692,6 +684,14 @@ address { font-style: normal; }
   background-size: 18px; padding-right: 2.75rem;
 }
 .field select option { color: #16130f; background: #fff; }
+
+/* AUDIT FIX: required asterisk */
+.field__required {
+  color: var(--accent);
+  font-weight: 700;
+  margin-left: 2px;
+}
+
 .quote-form__note { font-size: .8125rem; color: rgba(255,255,255,.65); text-align: center; }
 
 .quote-form__status {
@@ -703,6 +703,21 @@ address { font-style: normal; }
 .quote-form__status[data-state="error"]   { color: #ffbfa8; }
 .quote-form__status[data-state="success"] { color: #a7f3d0; }
 
+/* AUDIT FIX: email fallback line */
+.quote-form__alt {
+  font-size: .875rem;
+  color: rgba(255,255,255,.72);
+  text-align: center;
+  margin: -.25rem 0 0;
+}
+.quote-form__alt a {
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.quote-form__alt a:hover { color: #ff8a65; }
+
 .quote-form__noscript {
   font-size: .875rem; line-height: 1.55; color: rgba(255,255,255,.85);
   background: rgba(255,255,255,.06);
@@ -713,6 +728,152 @@ address { font-style: normal; }
   color: var(--accent); text-decoration: underline;
   font-weight: 700; white-space: nowrap;
 }
+
+/* ---------- Case studies (audit update) ---------- */
+.cases {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xl);
+}
+.case {
+  display: grid;
+  gap: var(--space-lg);
+  align-items: start;
+}
+@media (min-width: 900px) {
+  .case { grid-template-columns: 1fr 1.1fr; gap: var(--space-2xl); }
+  .case:nth-child(even) .case__media { order: 2; }
+}
+.case__media img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: var(--radius-lg);
+}
+.case__loc {
+  font-size: .75rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .12em;
+  color: var(--accent-text);
+  margin-bottom: .5rem;
+}
+.case__body h3 {
+  font-size: var(--step-2); font-weight: 800;
+  letter-spacing: -.02em; line-height: 1.2;
+  margin-bottom: var(--space-md);
+}
+.case__facts {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: .75rem;
+  padding: .85rem 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--space-md);
+}
+.case__facts > div { display: flex; flex-direction: column; gap: .15rem; }
+.case__facts dt {
+  font-size: .6875rem;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--ink-mute);
+  font-weight: 700;
+}
+.case__facts dd {
+  font-size: .95rem; font-weight: 800;
+  color: var(--accent-text);
+  letter-spacing: -.01em;
+}
+.case__story {
+  font-size: .95rem;
+  color: var(--ink-soft);
+  line-height: 1.6;
+  margin-bottom: .65rem;
+}
+.case__story strong { color: var(--ink); font-weight: 800; }
+
+/* ---------- Team section (audit update) ---------- */
+.team {
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-xl);
+  border-top: 1px solid var(--line);
+}
+.team__heading {
+  font-size: var(--step-2);
+  font-weight: 800;
+  letter-spacing: -.02em;
+  line-height: 1.2;
+  margin-bottom: var(--space-xl);
+  max-width: 520px;
+}
+.team__grid {
+  display: grid;
+  gap: var(--space-md);
+  grid-template-columns: 1fr;
+}
+@media (min-width: 640px) { .team__grid { grid-template-columns: repeat(3, 1fr); } }
+.team__member {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-lg);
+}
+.team__avatar {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+  display: grid; place-items: center;
+  font-weight: 800;
+  font-size: 1.15rem;
+  letter-spacing: -.01em;
+  margin-bottom: .85rem;
+}
+.team__name {
+  font-size: 1.05rem; font-weight: 800;
+  letter-spacing: -.01em;
+  margin-bottom: .15rem;
+}
+.team__role {
+  font-size: .8125rem; font-weight: 700;
+  color: var(--accent-text);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: .5rem;
+}
+.team__bio {
+  font-size: .9rem;
+  color: var(--ink-soft);
+  line-height: 1.55;
+}
+
+/* ---------- Breadcrumbs (audit update) ---------- */
+.breadcrumbs {
+  font-size: .8125rem;
+  color: var(--ink-mute);
+  padding: 1rem 0 0;
+}
+.breadcrumbs ol {
+  display: flex; flex-wrap: wrap;
+  gap: .5rem; align-items: center;
+}
+.breadcrumbs li {
+  display: inline-flex; align-items: center;
+  gap: .5rem;
+}
+.breadcrumbs li:not(:last-child)::after {
+  content: '›';
+  color: var(--ink-mute);
+  font-size: 1rem;
+  line-height: 1;
+}
+.breadcrumbs a {
+  color: var(--ink-soft);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--line);
+}
+.breadcrumbs a:hover { color: var(--accent-text); text-decoration-color: var(--accent-text); }
+.breadcrumbs [aria-current="page"] { color: var(--ink); font-weight: 700; text-decoration: none; }
 
 
 /* =========================================================================
@@ -822,10 +983,10 @@ address { font-style: normal; }
   position: absolute; inset: 0; z-index: 1;
   background: linear-gradient(
     180deg,
-    rgba(255,255,255,.98) 0%,
-    rgba(255,255,255,.94) 45%,
-    rgba(255,255,255,.74) 75%,
-    rgba(255,255,255,.38) 100%
+    rgba(255,255,255,.96) 0%,
+    rgba(255,255,255,.90) 40%,
+    rgba(255,255,255,.70) 72%,
+    rgba(255,255,255,.30) 100%
   );
 }
 @media (min-width: 900px) {
@@ -865,6 +1026,20 @@ address { font-style: normal; }
 .hero__promise a { color: var(--accent-text); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .hero__promise a:hover { color: var(--accent-dark); }
 
+/* AUDIT FIX: jump-to-costs link */
+.hero__jump {
+  margin: .25rem 0 var(--space-lg);
+  font-size: var(--step--1);
+}
+.hero__jump .link-arrow {
+  gap: .4rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1.5px;
+}
+.hero__jump svg { transition: transform .25s var(--ease); }
+.hero__jump a:hover svg { transform: translateY(3px); }
+
 .trust-strip {
   display: flex; flex-direction: column; gap: .65rem;
   padding-top: var(--space-lg); border-top: 1px solid var(--line);
@@ -892,12 +1067,17 @@ address { font-style: normal; }
   .js .hero__copy > *:nth-child(4) { animation-delay: .26s; }
   .js .hero__copy > *:nth-child(5) { animation-delay: .33s; }
   .js .hero__copy > *:nth-child(6) { animation-delay: .40s; }
+  .js .hero__copy > *:nth-child(7) { animation-delay: .47s; }
 
   @keyframes heroEnter {
     from { opacity: 0; translate: 0 24px; }
     to   { opacity: 1; translate: 0 0; }
   }
 }
+
+/* AUDIT FIX: county hero variant */
+.hero--county .hero__copy { max-width: 720px; }
+.hero--county h1 em { color: var(--accent-text); font-style: normal; }
 
 /* ---------- Proof bar ---------- */
 .proof-bar { background: var(--paper); border-block: 1px solid var(--line); padding-block: var(--space-lg); }
@@ -960,6 +1140,7 @@ address { font-style: normal; }
 .footer-col ul { display: flex; flex-direction: column; gap: .6rem; }
 .footer-col a { font-size: .95rem; color: var(--ink-soft); display: inline-block; padding-block: .25rem; }
 .footer-col a:hover { color: var(--accent-text); }
+.footer-col a[aria-current="page"] { color: var(--accent-text); font-weight: 700; }
 .footer-about p { font-size: .95rem; color: var(--ink-soft); margin-top: 1rem; max-width: 320px; }
 .footer-about__reg { font-size: .875rem !important; color: var(--ink-mute) !important; font-weight: 600; }
 .footer-bottom {
@@ -975,7 +1156,7 @@ address { font-style: normal; }
 }
 .footer-bottom--flush { margin-top: 0; border-top: none; padding-top: 0; }
 
-/* ---------- Sticky WhatsApp (mobile, bottom-right) ---------- */
+/* ---------- Sticky WhatsApp ---------- */
 .sticky-wa {
   position: fixed; bottom: calc(1rem + env(safe-area-inset-bottom)); right: 1rem;
   z-index: 90; display: flex; align-items: center; gap: .6rem;
@@ -989,7 +1170,7 @@ address { font-style: normal; }
 .sticky-wa svg { width: 22px; height: 22px; }
 @media (min-width: 900px) { .sticky-wa { display: none; } }
 
-/* ---------- Back to top (bottom-left) ---------- */
+/* ---------- Back to top ---------- */
 .to-top {
   position: fixed;
   bottom: calc(1rem + env(safe-area-inset-bottom));
@@ -1047,6 +1228,12 @@ address { font-style: normal; }
     from { opacity: 0; translate: 0 20px; }
     to   { opacity: 1; translate: 0 0; }
   }
+}
+
+/* AUDIT FIX: mobile padding for sticky CTAs.
+   Keeps the bottom 5rem of every page clear of .sticky-wa + .to-top. */
+@media (max-width: 899px) {
+  main { padding-bottom: 5rem; }
 }
 
 @media (prefers-reduced-motion: reduce) {
