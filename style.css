@@ -8,19 +8,19 @@
      5. Page sections (header, hero, footer, etc.)
      6. Utilities & motion preferences
 
-   CHANGELOG
-   - Removed dead rules (.section--dark, .btn--dark) and unused tokens
-   - FIX: gallery [data-extra] items now show on desktop
-   - Added back-to-top button styles
-   - Added scroll-reveal + hero entrance animations
-   - Added nav-link underline micro-interaction
-   - WhatsApp button uses dark text on brand green (6.16:1)
-   - CRO v2: added .cost-anchor styles
-   - CRO v2: added .hero__promise a link styling
-   - CRO v3: updated hero image + OG meta
-   - CRO v3: added real 2026 pricing to cost anchor and FAQ
-   - CRO v3: added per-square-metre reference table
-   - CRO v3: added .cost-anchor__heading for table titles
+   CHANGELOG — audit fixes
+   - FIX §1.1: added .hero__bg / .hero__scrim — hero image now positions
+     absolutely with a readable gradient overlay
+   - FIX §1.2: removed the two-column .hero__inner grid; copy now capped
+     at 680px on desktop instead of taking half the row
+   - FIX §1.5: removed .gallery-toggle[aria-expanded="true"] { display: none }
+     so the "Show fewer projects" state is reachable
+   - FIX §3.1: restored :focus-visible outline on form fields
+   - FIX §3.2: removed dead .hero__media and .btn--outline rules
+   - FIX §3.3: lightbox now animates via opacity/visibility (no 200 ms dead state)
+   - FIX §3.5: wrapped backdrop-filter in @supports
+   - ADD: .quote-form__status and .quote-form__noscript styles
+   - ADD: .faq--spaced and .footer-bottom--flush (used by privacy.html)
    ========================================================================= */
 
 
@@ -214,9 +214,6 @@ address { font-style: normal; }
 .btn--whatsapp { background: var(--wa); color: var(--wa-ink); box-shadow: 0 6px 16px rgba(37,211,102,.32); }
 .btn--whatsapp:hover { background: var(--wa-dark); color: var(--wa-ink); box-shadow: 0 8px 22px rgba(37,211,102,.40); }
 
-.btn--outline { border-color: var(--line); color: var(--ink); background: var(--paper); }
-.btn--outline:hover { background: var(--ink); color: #fff; border-color: var(--ink); }
-
 .btn--ghost { border-color: var(--line); background: var(--paper); color: var(--ink); }
 .btn--ghost:hover { border-color: var(--ink); }
 
@@ -276,7 +273,6 @@ address { font-style: normal; }
 }
 .cost-anchor__note { font-size: .8125rem; color: var(--ink-mute); margin-top: .5rem; line-height: 1.55; }
 
-/* Secondary cost anchor (per m² rates) */
 .cost-anchor + .cost-anchor { margin-top: var(--space-lg); }
 
 /* ---------- Check list ---------- */
@@ -355,14 +351,21 @@ address { font-style: normal; }
 
 .gallery-toggle-wrap { margin-top: var(--space-xl); text-align: center; }
 @media (min-width: 1000px) { .gallery-toggle-wrap { display: none; } }
-.gallery-toggle[aria-expanded="true"] { display: none; }
+/* NOTE (audit §1.5): the previous rule `.gallery-toggle[aria-expanded="true"]
+   { display: none; }` was removed — it made the collapse state unreachable. */
 
 /* ---------- Lightbox ---------- */
+/* FIX (audit §3.3): switched from display toggling to opacity/visibility so
+   the open/close transition actually plays. */
 .lightbox {
-  position: fixed; inset: 0; z-index: 200; background: rgba(15,12,9,.94);
-  display: none; align-items: center; justify-content: center; padding: 1rem;
+  position: fixed; inset: 0; z-index: 200;
+  background: rgba(15,12,9,.94);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1rem;
+  opacity: 0; visibility: hidden;
+  transition: opacity .2s var(--ease), visibility .2s var(--ease);
 }
-.lightbox.is-open { display: flex; }
+.lightbox.is-open { opacity: 1; visibility: visible; }
 .lightbox__img {
   max-width: min(100%, 1100px); max-height: 85vh;
   border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
@@ -414,6 +417,8 @@ address { font-style: normal; }
 
 /* ---------- FAQ ---------- */
 .faq { display: flex; flex-direction: column; gap: .6rem; }
+/* Used on privacy.html to add breathing room below the page intro. */
+.faq--spaced { margin-top: 2rem; }
 .faq details { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
 .faq summary {
   padding: 1.1rem 1.25rem; font-weight: 700; font-size: 1rem; cursor: pointer;
@@ -460,7 +465,30 @@ address { font-style: normal; }
   transition: border-color .2s, background .2s;
 }
 .field input::placeholder { color: rgba(255,255,255,.45); }
-.field input:focus, .field select:focus { outline: none; border-color: var(--accent); background: rgba(255,255,255,.1); }
+
+/* FIX (audit §3.1): removed bare `outline: none` so keyboard users keep a
+   visible focus indicator. Mouse-click focus is suppressed via :focus-visible
+   instead, which preserves the design intent without harming a11y. */
+.field input:focus,
+.field select:focus {
+  border-color: var(--accent);
+  background: rgba(255,255,255,.1);
+  outline: none;
+}
+.field input:focus-visible,
+.field select:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Browsers without :focus-visible get the outline on plain :focus too. */
+@supports not selector(:focus-visible) {
+  .field input:focus,
+  .field select:focus {
+    outline: 3px solid var(--accent);
+    outline-offset: 2px;
+  }
+}
+
 .field select {
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
@@ -469,6 +497,27 @@ address { font-style: normal; }
 }
 .field select option { color: #16130f; background: #fff; }
 .quote-form__note { font-size: .8125rem; color: rgba(255,255,255,.65); text-align: center; }
+
+/* ADD (audit §4.1): visible form status + noscript fallback */
+.quote-form__status {
+  font-size: .875rem; font-weight: 600;
+  color: rgba(255,255,255,.85);
+  text-align: center; min-height: 1.25rem;
+  margin: -.25rem 0 0;
+}
+.quote-form__status[data-state="error"]   { color: #ffbfa8; }
+.quote-form__status[data-state="success"] { color: #a7f3d0; }
+
+.quote-form__noscript {
+  font-size: .875rem; line-height: 1.55; color: rgba(255,255,255,.85);
+  background: rgba(255,255,255,.06);
+  border: 1px solid rgba(255,255,255,.14);
+  padding: .85rem 1rem; border-radius: var(--radius-sm); text-align: center;
+}
+.quote-form__noscript a {
+  color: var(--accent); text-decoration: underline;
+  font-weight: 700; white-space: nowrap;
+}
 
 
 /* =========================================================================
@@ -482,11 +531,15 @@ address { font-style: normal; }
   border-bottom: 1px solid transparent;
   transition: border-color .3s, box-shadow .3s;
 }
+/* FIX (audit §3.5): only apply backdrop-filter when the browser supports it,
+   so devices that render it slowly fall back to the opaque background. */
 @media (min-width: 900px) {
-  .site-header {
-    background: rgba(255,255,255,.88);
-    backdrop-filter: saturate(180%) blur(12px);
-    -webkit-backdrop-filter: saturate(180%) blur(12px);
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .site-header {
+      background: rgba(255,255,255,.88);
+      backdrop-filter: saturate(180%) blur(12px);
+      -webkit-backdrop-filter: saturate(180%) blur(12px);
+    }
   }
 }
 .site-header.is-scrolled { border-bottom-color: var(--line); box-shadow: 0 1px 0 rgba(22,19,15,.02); }
@@ -558,14 +611,59 @@ address { font-style: normal; }
 }
 
 /* ---------- Hero ---------- */
+/* FIX (audit §1.1 / §1.2): the hero is now a positioning context for the
+   full-bleed background image, and the copy is capped rather than squeezed
+   into a two-column grid that only had one child. */
 .hero {
   position: relative;
-  padding-block: clamp(2.5rem, 6vw, 4.5rem) clamp(3rem, 7vw, 5rem);
-  background: linear-gradient(180deg, var(--surface) 0%, var(--paper) 100%);
+  isolation: isolate;
+  padding-block: clamp(3rem, 7vw, 6rem);
   overflow: hidden;
+  background: var(--surface); /* pre-image fallback while the bg loads */
 }
-.hero__inner { display: grid; gap: var(--space-xl); align-items: center; }
+
+.hero__bg {
+  position: absolute; inset: 0; z-index: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+  object-position: center 40%;
+}
+
+/* Readability scrim. On narrow screens the copy occupies the full width,
+   so we darken top-to-bottom. On desktop the copy sits on the left, so the
+   gradient runs left-to-right and lets the image breathe on the right. */
+.hero__scrim {
+  position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(
+    180deg,
+    rgba(255,255,255,.98) 0%,
+    rgba(255,255,255,.94) 45%,
+    rgba(255,255,255,.74) 75%,
+    rgba(255,255,255,.38) 100%
+  );
+}
+@media (min-width: 900px) {
+  .hero__scrim {
+    background: linear-gradient(
+      100deg,
+      rgba(255,255,255,.98) 0%,
+      rgba(255,255,255,.93) 42%,
+      rgba(255,255,255,.55) 72%,
+      rgba(255,255,255,.12) 100%
+    );
+  }
+}
+
+.hero__inner {
+  position: relative;
+  z-index: 2;
+}
 .hero__copy { max-width: 640px; }
+@media (min-width: 900px) {
+  .hero { min-height: 640px; display: grid; align-content: center; }
+  .hero__copy { max-width: 680px; }
+}
+
 .hero h1 { font-size: var(--step-5); line-height: 1.06; letter-spacing: -.032em; font-weight: 800; margin-bottom: var(--space-md); }
 .hero h1 em { font-style: normal; color: var(--accent-text); }
 .hero__lead { font-size: var(--step-1); color: var(--ink-soft); margin-bottom: var(--space-lg); max-width: 540px; }
@@ -592,23 +690,15 @@ address { font-style: normal; }
   background: var(--accent-soft) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23bf4318'%3E%3Cpath d='M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z'/%3E%3C/svg%3E") center/12px no-repeat;
 }
 
-.hero__media { position: relative; border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow-lg); }
-.hero__media img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; }
-
 @media (min-width: 600px) {
   .hero__actions .btn { flex: 0 1 auto; }
   .trust-strip { flex-direction: row; flex-wrap: wrap; gap: 1.5rem; }
-}
-@media (min-width: 900px) {
-  .hero__inner { grid-template-columns: 1.05fr 1fr; gap: var(--space-2xl); }
-  .hero__media img { aspect-ratio: 5 / 6; }
 }
 
 /* Hero entrance — staggered fade + rise. Uses `translate` (not `transform`)
    so button hover transforms never conflict with the entrance animation. */
 @media (prefers-reduced-motion: no-preference) {
-  .js .hero__copy > *,
-  .js .hero__media {
+  .js .hero__copy > * {
     opacity: 0;
     animation: heroEnter .9s var(--ease) forwards;
   }
@@ -618,7 +708,6 @@ address { font-style: normal; }
   .js .hero__copy > *:nth-child(4) { animation-delay: .26s; }
   .js .hero__copy > *:nth-child(5) { animation-delay: .33s; }
   .js .hero__copy > *:nth-child(6) { animation-delay: .40s; }
-  .js .hero__media { animation-delay: .15s; }
 
   @keyframes heroEnter {
     from { opacity: 0; translate: 0 24px; }
@@ -700,6 +789,9 @@ address { font-style: normal; }
 @media (min-width: 700px) {
   .footer-bottom { flex-direction: row; justify-content: space-between; align-items: center; }
 }
+/* Used by privacy.html to remove the double border when the footer sits
+   directly under the page content. */
+.footer-bottom--flush { margin-top: 0; border-top: none; padding-top: 0; }
 
 /* ---------- Sticky WhatsApp (mobile, bottom-right) ---------- */
 .sticky-wa {

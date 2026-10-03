@@ -1,9 +1,23 @@
 /* =========================================================
    JASHO WORKS — MAIN SCRIPT
-   Progressive enhancement only. Site works without JS
-   for navigation, content and contact — the gallery limit,
+   Progressive enhancement only. Site works without JS for
+   navigation, content and contact — the gallery limit,
    form interception, FAQ auto-close, back-to-top and
    scroll-reveal are the only JS-dependent behaviours.
+
+   CHANGELOG — audit fixes
+   - ADD §1.3: initJsClass now applies the .js hook that every
+     animation rule is gated behind (was previously only on
+     privacy.html, which meant the homepage never animated).
+   - FIX §1.4: data-wa templating is now actually wired up.
+   - FIX §3.3: lightbox toggles via is-open class only; no
+     more display:hidden flag, so the transition plays.
+   - FIX §4.2: form submission uses an anchor click instead of
+     window.open() to survive popup blockers.
+   - FIX §4.1: form has explicit validation, length caps,
+     live status region and screen-reader announcements.
+   - FIX §6: lightbox image now keeps its descriptive alt text;
+     background regions are made inert while it's open.
 ========================================================= */
 
 'use strict';
@@ -42,7 +56,27 @@ function trapFocus(container, e) {
 
 
 /* ---------------------------------------------------------
-   0. WHATSAPP TEMPLATE
+   0a. JS-CLASS HOOK
+   Sets html.js so the animation rules in style.css activate.
+   The setTimeout is a safety net: if main.js fails to load
+   or throws before initReveal runs, the class is stripped and
+   every [data-reveal] element goes back to full opacity.
+--------------------------------------------------------- */
+(function initJsClass() {
+  const root = document.documentElement;
+  root.classList.remove('no-js');
+  root.classList.add('js');
+
+  window.setTimeout(function () {
+    if (!window.__jashoRevealReady) {
+      root.classList.remove('js');
+    }
+  }, 2500);
+})();
+
+
+/* ---------------------------------------------------------
+   0b. WHATSAPP TEMPLATE
    Single source of truth for every WhatsApp link. Elements
    carry a `data-wa` attribute with the message body; the
    number, sign-off and URL encoding live here. Static hrefs
@@ -204,6 +238,12 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
 /* ---------------------------------------------------------
    5. LIGHTBOX
+   FIX (audit §3.3): state is driven purely by the `is-open`
+   class — the `hidden` attribute is not used, so the CSS
+   opacity/visibility transition can actually animate.
+   FIX (audit §6): the descriptive alt text from the thumbnail
+   is passed through, and background regions are made inert
+   while the dialog is open.
 --------------------------------------------------------- */
 (function initLightbox() {
   const lightbox  = document.querySelector('[data-lightbox]');
@@ -212,16 +252,42 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
   const closeBtn  = document.querySelector('[data-lightbox-close]');
   if (!lightbox || !imgEl || !closeBtn) return;
 
+  // Regions we hide from assistive tech (and, where supported, from focus)
+  // while the dialog is open.
+  const backgroundRegions = [
+    document.querySelector('.site-header'),
+    document.querySelector('main'),
+    document.querySelector('.site-footer'),
+    document.querySelector('.sticky-wa'),
+    document.querySelector('.to-top')
+  ].filter(Boolean);
+
+  function setBackgroundInert(on) {
+    backgroundRegions.forEach((el) => {
+      if (on) {
+        el.setAttribute('inert', '');
+        el.setAttribute('aria-hidden', 'true');
+      } else {
+        el.removeAttribute('inert');
+        el.removeAttribute('aria-hidden');
+      }
+    });
+  }
+
   let lastFocused = null;
   let touchStartY = 0;
 
-  function open(src, caption) {
+  function isOpen() {
+    return lightbox.classList.contains('is-open');
+  }
+
+  function open(src, caption, alt) {
     lastFocused = document.activeElement;
     imgEl.src = src;
-    imgEl.alt = '';
+    imgEl.alt = alt || caption || 'Project image';
     captionEl.textContent = caption || '';
-    lightbox.hidden = false;
-    requestAnimationFrame(() => lightbox.classList.add('is-open'));
+    setBackgroundInert(true);
+    lightbox.classList.add('is-open');
     document.body.style.overflow = 'hidden';
     closeBtn.focus();
   }
@@ -229,12 +295,19 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
   function close() {
     lightbox.classList.remove('is-open');
     document.body.style.overflow = '';
-    setTimeout(() => {
-      lightbox.hidden = true;
-      imgEl.removeAttribute('src');
-      if (lastFocused && typeof lastFocused.focus === 'function') lastFocused.focus();
+    setBackgroundInert(false);
+
+    if (lastFocused && typeof lastFocused.focus === 'function') {
+      lastFocused.focus();
       lastFocused = null;
-    }, 200);
+    }
+
+    // Clear the src after the fade completes so a stale image isn't
+    // kept in memory, and so a screen reader on the page underneath
+    // doesn't encounter it if the user navigates back.
+    window.setTimeout(() => {
+      if (!isOpen()) imgEl.removeAttribute('src');
+    }, 260);
   }
 
   document.querySelectorAll('.project').forEach((btn) => {
@@ -243,7 +316,8 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
       const src     = btn.dataset.img || (img && img.src) || '';
       const title   = btn.querySelector('.project__title');
       const caption = btn.dataset.caption || (title ? title.textContent : '');
-      if (src) open(src, caption);
+      const alt     = img ? img.alt : caption;
+      if (src) open(src, caption, alt);
     });
   });
 
@@ -260,7 +334,7 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
   }, { passive: true });
 
   document.addEventListener('keydown', (e) => {
-    if (lightbox.hidden) return;
+    if (!isOpen()) return;
     if (e.key === 'Escape') { close(); return; }
     trapFocus(lightbox, e);
   });
@@ -269,20 +343,49 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
 /* ---------------------------------------------------------
    6. QUOTE FORM
-   Builds a formatted WhatsApp message from the three answers.
-   Falls back to the form's mailto: action if JS is unavailable.
+   FIX (audit §4.1 / §4.2 / §5):
+   - Trims, collapses whitespace and length-caps each field
+     before composing the WhatsApp message.
+   - Uses an anchor click rather than window.open() so popup
+     blockers and popup-blocker-hiding browsers don't eat it.
+   - Reports validation errors and success in a live status
+     region instead of silently doing nothing.
 --------------------------------------------------------- */
 (function initQuoteForm() {
   const form = document.querySelector('[data-quote-form]');
   if (!form) return;
 
+  const status = form.querySelector('[data-quote-status]');
+
+  function setStatus(message, state) {
+    if (!status) return;
+    status.textContent = message || '';
+    if (state) status.dataset.state = state;
+    else status.removeAttribute('data-state');
+  }
+
+  function clean(value, max) {
+    return String(value == null ? '' : value)
+      .trim()
+      .replace(/\s+/g, ' ')
+      .slice(0, max);
+  }
+
   form.addEventListener('submit', (e) => {
     e.preventDefault();
 
     const data     = new FormData(form);
-    const name     = (data.get('name') || '').toString().trim();
-    const location = (data.get('location') || '').toString().trim();
-    const type     = (data.get('project_type') || '').toString().trim();
+    const name     = clean(data.get('name'), 80);
+    const location = clean(data.get('location'), 120);
+    const type     = clean(data.get('project_type'), 60);
+
+    if (!name || !location || !type) {
+      const missing = !name ? 'name' : (!location ? 'location' : 'project_type');
+      setStatus('Please fill in your name, project location and project type.', 'error');
+      const field = form.querySelector('[name="' + missing + '"]');
+      if (field && typeof field.focus === 'function') field.focus();
+      return;
+    }
 
     const message =
       'Hi Jasho Works,\n\n' +
@@ -291,7 +394,17 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
       'Location: ' + location + '\n' +
       'Project type: ' + type;
 
-    window.open(buildWhatsAppLink(message), '_blank', 'noopener');
+    // Anchor click instead of window.open: never blocked, keeps the
+    // user gesture intact, and works in every browser.
+    const link = document.createElement('a');
+    link.href = buildWhatsAppLink(message);
+    link.target = '_blank';
+    link.rel = 'noopener';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    setStatus('Opening WhatsApp… if nothing happens, call 0702 555 093.', 'success');
   });
 })();
 
@@ -338,6 +451,10 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
    hover transforms keep working. Respects prefers-reduced-motion.
 --------------------------------------------------------- */
 (function initReveal() {
+  // Mark ready before the early-return so the initJsClass safety
+  // net knows this script reached the end successfully.
+  window.__jashoRevealReady = true;
+
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
   const SELECTORS = [
@@ -369,10 +486,6 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
       });
     });
   });
-
-  // Mark reveal system ready — the inline head-script uses this
-  // to know it shouldn't strip the .js class.
-  window.__jashoRevealReady = true;
 
   if (!('IntersectionObserver' in window)) {
     els.forEach((el) => el.classList.add('is-revealed'));

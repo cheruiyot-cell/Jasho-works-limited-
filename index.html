@@ -1,8 +1,11 @@
 <!DOCTYPE html>
-<html lang="en-KE">
+<html lang="en-KE" class="no-js">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
+<!-- FIX (audit §2.2): limit referrer leakage to third-party image/font hosts -->
+<meta name="referrer" content="strict-origin-when-cross-origin">
 
 <title>Jasho Works | Affordable Home Construction in Kenya</title>
 
@@ -17,13 +20,21 @@
 <meta property="og:title" content="Jasho Works Limited | Affordable Home Construction in Kenya">
 <meta property="og:description" content="Beautiful homes, built affordably. 12 years of trusted construction across Nairobi, Machakos, Kajiado and Kiambu.">
 <meta property="og:url" content="https://www.jashoworks.co.ke/">
-<meta property="og:image" content="https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1200&q=75">
+<!-- FIX (audit §7): OG image now cropped to the canonical 1200×630 ratio -->
+<meta property="og:image" content="https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1200&h=630&q=75">
 <meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="900">
+<meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
 
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23bf4318'/%3E%3Cpath d='M6 13h12v3H6zm0-5h12v3H6z' fill='%23fff'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+
+<!-- FIX (audit §3.4): load the declared 'Plus Jakarta Sans' font. If you'd
+     rather self-host (best for privacy), drop these two lines and add
+     @font-face rules pointing at /fonts/*.woff2 instead. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap">
 
 <link rel="preconnect" href="https://images.unsplash.com">
 
@@ -47,7 +58,7 @@
   "url": "https://www.jashoworks.co.ke/",
   "telephone": "+254702555093",
   "email": "hello@jashoworks.co.ke",
-  "image": "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1200&q=75",
+  "image": "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1200&h=630&q=75",
   "priceRange": "KES",
   "currenciesAccepted": "KES",
   "paymentAccepted": "Cash, M-Pesa, Bank Transfer",
@@ -74,11 +85,6 @@
     { "@type": "OpeningHoursSpecification", "dayOfWeek": ["Monday","Tuesday","Wednesday","Thursday","Friday"], "opens": "08:00", "closes": "17:00" }
   ],
   "foundingDate": "2013",
-  "hasCredential": {
-    "@type": "EducationalOccupationalCredential",
-    "credentialCategory": "National Construction Authority Contractor Registration",
-    "identifier": "NCA/1234/2013"
-  },
   "sameAs": [
     "https://www.google.com/maps/place/jasho-works",
     "https://www.facebook.com/jashoworks",
@@ -127,7 +133,10 @@
         <li><a href="#faq">FAQs</a></li>
         <li><a href="#contact">Contact</a></li>
       </ul>
+      <!-- FIX (audit §1.4): data-wa drives the WhatsApp link via JS; static
+           href stays as the no-JS fallback. -->
       <a class="btn btn--whatsapp nav__cta"
+         data-wa="Hi Jasho Works, I'd like a free quote for a construction project."
          href="https://wa.me/254702555093?text=Hi%20Jasho%20Works%2C%20I%27d%20like%20a%20free%20quote%20for%20a%20construction%20project."
          rel="noopener" target="_blank">
         <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" aria-hidden="true">
@@ -174,6 +183,7 @@
 
         <div class="hero__actions">
           <a class="btn btn--whatsapp btn--lg"
+             data-wa="Hi Jasho Works, I'd like a free quote."
              href="https://wa.me/254702555093?text=Hi%20Jasho%20Works%2C%20I%27d%20like%20a%20free%20quote."
              rel="noopener" target="_blank">
             <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden="true">
@@ -211,6 +221,7 @@
         </svg>
         <div>
           <strong>NCA Registered</strong>
+          <!-- TODO (audit §2.4): verify this registration number before launch -->
           <span>Contractor No. NCA/1234/2013</span>
         </div>
       </div>
@@ -323,7 +334,9 @@
 
       <p class="section__foot">
         Not sure where to start? Send a photo of your plot or plan on
-        <a class="link-arrow" href="https://wa.me/254702555093?text=Hi%2C%20I%27d%20like%20advice%20on%20a%20construction%20project."
+        <a class="link-arrow"
+           data-wa="Hi, I'd like advice on a construction project."
+           href="https://wa.me/254702555093?text=Hi%2C%20I%27d%20like%20advice%20on%20a%20construction%20project."
            rel="noopener" target="_blank">WhatsApp</a>
         — we'll tell you what's buildable on your budget, usually within 2 hours.
       </p>
@@ -359,7 +372,10 @@
 
       <p class="visually-hidden" role="status" data-gallery-status></p>
 
-      <ul class="gallery" data-gallery data-limit="6" aria-live="polite">
+      <!-- FIX (audit §6): removed aria-live from the <ul> — the role="status"
+           paragraph above already announces filter results. Also added the
+           id the toggle's aria-controls attribute now points at. -->
+      <ul class="gallery" id="project-gallery" data-gallery data-limit="6">
         <li>
           <button class="project" type="button" data-cat="residential"
                   data-img="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?auto=format&fit=crop&w=1600&q=80"
@@ -579,8 +595,9 @@
       </ul>
 
       <p class="gallery-toggle-wrap">
+        <!-- FIX (audit §1.5): aria-controls now points at the actual <ul> -->
         <button class="btn btn--ghost gallery-toggle" type="button"
-                data-gallery-toggle aria-expanded="false" aria-controls="projects">
+                data-gallery-toggle aria-expanded="false" aria-controls="project-gallery">
           Show all 12 projects
         </button>
       </p>
@@ -588,7 +605,9 @@
   </section>
 
   <!-- ===================== LIGHTBOX ===================== -->
-  <div class="lightbox" data-lightbox role="dialog" aria-modal="true" aria-label="Project image viewer" hidden>
+  <!-- FIX (audit §3.3): `hidden` removed — CSS visibility handles state
+       so the opacity/visibility transition can play. -->
+  <div class="lightbox" data-lightbox role="dialog" aria-modal="true" aria-label="Project image viewer">
     <button class="lightbox__close" type="button" data-lightbox-close aria-label="Close image viewer">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="22" height="22" aria-hidden="true">
         <path d="M18 6 6 18M6 6l12 12"/>
@@ -744,7 +763,9 @@
 
       <p class="section__foot">
         Want a real number for your project? Send us your plan or plot details on
-        <a class="link-arrow" href="https://wa.me/254702555093?text=Hi%20Jasho%20Works%2C%20I%27d%20like%20a%20cost%20estimate%20for%20my%20project."
+        <a class="link-arrow"
+           data-wa="Hi Jasho Works, I'd like a cost estimate for my project."
+           href="https://wa.me/254702555093?text=Hi%20Jasho%20Works%2C%20I%27d%20like%20a%20cost%20estimate%20for%20my%20project."
            rel="noopener" target="_blank">WhatsApp</a>
         and we'll send an itemised quote within 48 hours.
       </p>
@@ -964,6 +985,7 @@
           </p>
           <div class="cta-actions">
             <a class="btn btn--whatsapp btn--lg"
+               data-wa="Hi Jasho Works, I'd like to discuss a project."
                href="https://wa.me/254702555093?text=Hi%20Jasho%20Works%2C%20I%27d%20like%20to%20discuss%20a%20project."
                rel="noopener" target="_blank">
               <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20" aria-hidden="true">
@@ -979,20 +1001,21 @@
             </a>
           </div>
 
-          <form class="quote-form" data-quote-form
-                action="mailto:hello@jashoworks.co.ke" method="post" enctype="text/plain">
+          <!-- FIX (audit §2.3): dropped the non-functional mailto action —
+               the form is now intercepted by JS, with a noscript fallback. -->
+          <form class="quote-form" data-quote-form novalidate>
             <p class="quote-form__title">Rather not chat? Send the details — we'll come back within 48 hours.</p>
 
             <label class="field">
               <span class="field__label">Your name</span>
               <input type="text" name="name" autocomplete="name" required
-                     placeholder="e.g. Wanjiku Kamau">
+                     maxlength="80" placeholder="e.g. Wanjiku Kamau">
             </label>
 
             <label class="field">
               <span class="field__label">Project location</span>
               <input type="text" name="location" autocomplete="address-level2" required
-                     placeholder="e.g. Ruiru, Kiambu">
+                     maxlength="120" placeholder="e.g. Ruiru, Kiambu">
             </label>
 
             <label class="field">
@@ -1012,9 +1035,21 @@
               Send my details — get a quote in 48 hours
             </button>
 
+            <!-- FIX (audit §4.1): visible live status for form feedback -->
+            <p class="quote-form__status" data-quote-status role="status" aria-live="polite"></p>
+
             <p class="quote-form__note">
               Free site visit included. We reply within 2 working hours, Mon–Fri 8am–5pm.
             </p>
+
+            <noscript>
+              <p class="quote-form__noscript">
+                This form needs JavaScript to send via WhatsApp. Please reach us directly:
+                <a href="https://wa.me/254702555093">WhatsApp 0702 555 093</a> ·
+                <a href="tel:+254702555093">call 0702 555 093</a> ·
+                <a href="mailto:hello@jashoworks.co.ke">hello@jashoworks.co.ke</a>
+              </p>
+            </noscript>
           </form>
         </div>
 
@@ -1114,7 +1149,9 @@
       </div>
 
       <div class="footer-col">
-        <h2 class="footer-col__title">Services</h2>
+        <!-- FIX (audit §6): footer column titles demoted to <h3> so they
+             don't pollute the document outline alongside section headings. -->
+        <h3 class="footer-col__title">Services</h3>
         <ul>
           <li><a href="#services">Home construction</a></li>
           <li><a href="#services">Renovations</a></li>
@@ -1125,7 +1162,7 @@
       </div>
 
       <div class="footer-col">
-        <h2 class="footer-col__title">Areas</h2>
+        <h3 class="footer-col__title">Areas</h3>
         <ul>
           <li><a href="#areas">Nairobi</a></li>
           <li><a href="#areas">Machakos</a></li>
@@ -1135,9 +1172,13 @@
       </div>
 
       <div class="footer-col">
-        <h2 class="footer-col__title">Contact</h2>
+        <h3 class="footer-col__title">Contact</h3>
         <ul>
-          <li><a href="https://wa.me/254702555093" rel="noopener" target="_blank">WhatsApp 0702 555 093</a></li>
+          <li>
+            <a data-wa="Hi Jasho Works, I'd like a free quote."
+               href="https://wa.me/254702555093?text=Hi%20Jasho%20Works%2C%20I%27d%20like%20a%20free%20quote."
+               rel="noopener" target="_blank">WhatsApp 0702 555 093</a>
+          </li>
           <li><a href="tel:+254702555093">Call 0702 555 093</a></li>
           <li><a href="mailto:hello@jashoworks.co.ke">hello@jashoworks.co.ke</a></li>
           <li><a href="https://maps.google.com/?q=Kilimani+Business+Centre+Nairobi" rel="noopener" target="_blank">Kilimani Business Centre, Nairobi</a></li>
@@ -1157,6 +1198,7 @@
 
 <!-- ===================== STICKY WHATSAPP (mobile) ===================== -->
 <a class="sticky-wa"
+   data-wa="Hi Jasho Works, I'd like a free quote."
    href="https://wa.me/254702555093?text=Hi%20Jasho%20Works%2C%20I%27d%20like%20a%20free%20quote."
    rel="noopener" target="_blank"
    aria-label="Get a free construction quote on WhatsApp">
