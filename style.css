@@ -26,6 +26,23 @@
      re-derives [data-extra] from it at init)
    - G3: .project uses cursor: zoom-in
 
+   CHANGELOG — gallery responsiveness (G6–G9)
+   - G6: the 2-column breakpoint moves 420px → 560px. At 420px each
+     tile was 186 × 139px, which left ~5px of headroom for the meta
+     strip once the 1.1rem padding, category badge, 2-line title and
+     location were stacked up. 560px restores ~50px of slack.
+   - G6b: .project__title is clamped to 2 lines as belt-and-braces —
+     a 3-line title would push the badge past .project's overflow
+     edge with no scroll and no ellipsis.
+   - G8: .no-js reveals [data-extra] tiles. Without JS there is no
+     "show more" button, so half the portfolio would otherwise be
+     permanently unreachable on mobile.
+   - G9: .lightbox__stage gets an explicit touch-action so a
+     swipe-down that starts on the stage letterbox — rather than on
+     the photo — still reaches touchend instead of being claimed by
+     the browser as a scroll. Overridden while zoomed, or vertical
+     panning would break.
+
    CHANGELOG — lightbox
    - L1: added prev/next, zoom, counter, spinner, stage
    - L2: stage uses overflow: auto + image margin: auto (both edges
@@ -325,7 +342,13 @@ address { font-style: normal; }
 
 /* ---------- Gallery ---------- */
 .gallery { display: grid; gap: var(--space-md); grid-template-columns: 1fr; }
-@media (min-width: 420px) { .gallery { grid-template-columns: repeat(2, 1fr); } }
+
+/* G6: was 420px. At 420px each tile is 186 × 139px, and the meta
+   strip — 1.1rem padding × 2, the category badge, a 2-line title and
+   the location — measures ~134px. That left ~5px of headroom, so a
+   title wrapping to three lines clipped the badge off the top edge
+   of .project with no scroll and no ellipsis. 560px restores ~50px. */
+@media (min-width: 560px) { .gallery { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1000px){ .gallery { grid-template-columns: repeat(3, 1fr); } }
 
 /* Mobile: hide "extra" projects until the toggle (or a filter) reveals
@@ -334,6 +357,12 @@ address { font-style: normal; }
    never see a flash of all cards before the script runs. */
 .gallery[data-limit] > li[data-extra] { display: none; }
 .gallery.is-expanded > li[data-extra] { display: block; }
+
+/* G8: without JS there is no "show more" button, so hiding half the
+   portfolio behind a control that cannot exist would be worse than the
+   layout shift the rule above guards against. main.js strips .no-js as
+   its first action, so this only applies when the script isn't running. */
+.no-js .gallery[data-limit] > li[data-extra] { display: block; }
 
 /* Desktop: no limit — every project is always on screen. */
 @media (min-width: 1000px) {
@@ -371,7 +400,18 @@ address { font-style: normal; }
   color: var(--accent-dark); background: rgba(255,255,255,.95);
   padding: .25rem .55rem; border-radius: var(--radius-xs); margin-bottom: .5rem;
 }
-.project__title { font-size: 1.02rem; font-weight: 700; line-height: 1.25; display: block; }
+
+/* G6b: clamped as belt-and-braces. At the narrowest 2-column tile a
+   3-line title would push the category badge past .project's
+   overflow: hidden edge — clipped, with no scrollbar and no ellipsis. */
+.project__title {
+  font-size: 1.02rem; font-weight: 700; line-height: 1.25;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+}
 .project__loc { font-size: .875rem; color: rgba(255,255,255,.92); margin-top: .15rem; display: block; }
 .project.is-hidden { display: none; }
 
@@ -391,7 +431,12 @@ address { font-style: normal; }
 
 /* Stage clips + scrolls the image. `margin: auto` on the child (rather
    than place-items) so both edges stay reachable when the image
-   overflows while zoomed. */
+   overflows while zoomed.
+
+   G9: touch-action is declared because without it a swipe-down that
+   starts on the stage letterbox — rather than on the photo — is
+   claimed by the browser as a scroll and never reaches touchend, so
+   the viewer silently refuses to close. */
 .lightbox__stage {
   max-width: min(100%, 1100px);
   max-height: 85vh;
@@ -401,6 +446,13 @@ address { font-style: normal; }
   -webkit-overflow-scrolling: touch;
   display: grid;
   border-radius: var(--radius-md);
+  touch-action: pan-x pinch-zoom;
+}
+
+/* G9: zoomed, the image overflows on both axes, so both axes must be
+   pannable or vertical panning breaks. */
+.lightbox.is-zoomed .lightbox__stage {
+  touch-action: pan-x pan-y pinch-zoom;
 }
 
 .lightbox__img {

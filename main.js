@@ -28,6 +28,21 @@
    - G5: [data-limit] is the single source of truth for the
      mobile cutoff; [data-extra] is re-derived at init.
 
+   CHANGELOG — gallery responsiveness (G6–G9)
+   - G6: one isTileVisible() predicate, shared by the filter
+     counter and the lightbox project list. The lightbox
+     used to walk all 12 tiles even when the gallery was
+     collapsed to 6 on mobile — wrong counter, unreachable
+     images, and focus lost on close.
+   - G7: GALLERY_WIDE_MQ + a change listener re-sync the
+     lightbox list and the live status when the 1000px
+     breakpoint flips mid-session.
+   - G8: the toggle's own [hidden] state is the single
+     source of truth; the filter no longer un-hides a
+     button that has no click handler.
+   - G9: expand/collapse fires `gallery:toggled` so the
+     live status is recomputed for screen-reader users.
+
    CHANGELOG — lightbox
    - L1: prev/next navigation (buttons, swipe, arrow keys),
      live counter, and a loading spinner.
@@ -73,6 +88,29 @@ function trapFocus(container, e) {
     e.preventDefault();
     first.focus();
   }
+}
+
+
+/* ---------------------------------------------------------
+   GALLERY GEOMETRY — one breakpoint, one predicate
+   The 1000px cutoff lives here and in style.css. Everything
+   that asks "is this tile on screen right now?" must go
+   through isTileVisible(): the filter's live count and the
+   lightbox's prev/next list. If those two ever disagree you
+   get a counter that lies and a viewer that steps through
+   images the user cannot see.
+--------------------------------------------------------- */
+const GALLERY_WIDE_MQ = window.matchMedia('(min-width: 1000px)');
+
+function isTileVisible(li) {
+  if (!li || li.classList.contains('is-hidden')) return false;
+  if (!li.hasAttribute('data-extra')) return true;
+  if (GALLERY_WIDE_MQ.matches) return true;
+  const gallery = li.closest('[data-gallery]');
+  return !!gallery && (
+    gallery.classList.contains('is-expanded') ||
+    gallery.classList.contains('is-filtered')
+  );
 }
 
 
@@ -209,19 +247,28 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
    6. FILTERABLE GALLERY
    G1: the live-status count reflects what is actually
        rendered on mobile (was over-reporting on the
-       limited view).
+       limited view). Now via the shared isTileVisible().
    G2: the "show more" toggle is hidden while a filter is
        active — it had nothing left to reveal.
+   G7: crossing the 1000px breakpoint flips [data-extra]
+       visibility, so the status is recomputed.
+   G8: the toggle's own [hidden] state is the source of
+       truth — a filter never un-hides a dead button.
+   G9: expand/collapse fires `gallery:toggled` so the
+       status is recomputed for screen readers.
 --------------------------------------------------------- */
 (function initGalleryFilter() {
   const filtersEl  = document.querySelector('[data-filters]');
   const gallery    = document.querySelector('[data-gallery]');
   const status     = document.querySelector('[data-gallery-status]');
   const toggleWrap = document.querySelector('.gallery-toggle-wrap');
+  const toggle     = document.querySelector('[data-gallery-toggle]');
   if (!filtersEl || !gallery) return;
 
   const buttons = Array.from(filtersEl.querySelectorAll('[data-filter]'));
   const items   = Array.from(gallery.children);
+
+  let currentFilter = 'all';
 
   const counts = { all: items.length };
   items.forEach((item) => {
@@ -235,17 +282,15 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     if (badge) badge.textContent = counts[b.dataset.filter] || 0;
   });
 
-  // True only if the item is actually rendered right now.
-  function isRendered(el) {
-    if (el.classList.contains('is-hidden')) return false;
-    if (!el.hasAttribute('data-extra')) return true;
-    const wide     = window.matchMedia('(min-width: 1000px)').matches;
-    const expanded = gallery.classList.contains('is-expanded');
-    const filtered = gallery.classList.contains('is-filtered');
-    return wide || expanded || filtered;
-  }
+  /* `options.announce === false` suppresses the live-status write.
+     Used for the initial paint only: an aria-live region populated
+     during load can be read aloud by some screen readers, and
+     "Showing 12 of 12 projects" is not an answer to anything the
+     user asked. */
+  function apply(filter, options) {
+    const announce = !options || options.announce !== false;
+    currentFilter = filter;
 
-  function apply(filter) {
     items.forEach((item) => {
       const btn = item.querySelector('.project');
       const cat = btn ? btn.dataset.cat : '';
@@ -255,16 +300,20 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     gallery.classList.toggle('is-filtered', filter !== 'all');
 
     // While a filter is active every match is already on screen, so the
-    // "show more" toggle has nothing left to reveal — hide it. It comes
-    // back the moment the user returns to "All Projects".
-    if (toggleWrap) toggleWrap.hidden = filter !== 'all';
+    // "show more" toggle has nothing left to reveal — hide it. It also
+    // stays hidden if initGalleryToggle found nothing to reveal and
+    // removed the button itself.
+    if (toggleWrap) {
+      const toggleUsable = toggle && !toggle.hidden;
+      toggleWrap.hidden = (filter !== 'all') || !toggleUsable;
+    }
 
     buttons.forEach((b) => {
       b.setAttribute('aria-pressed', b.dataset.filter === filter ? 'true' : 'false');
     });
 
-    if (status) {
-      const visible = items.filter(isRendered).length;
+    if (status && announce) {
+      const visible = items.filter(isTileVisible).length;
       status.textContent = filter === 'all'
         ? 'Showing ' + visible + ' of ' + items.length + ' projects.'
         : 'Showing ' + visible + ' ' + filter + ' projects.';
@@ -274,6 +323,18 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
   buttons.forEach((btn) => {
     btn.addEventListener('click', () => apply(btn.dataset.filter));
   });
+
+  // Expanding/collapsing changes what is rendered, so the status has
+  // to be recomputed even though the filter itself didn't change.
+  gallery.addEventListener('gallery:toggled', () => apply(currentFilter));
+
+  // Crossing 1000px flips [data-extra] visibility. Without this the
+  // status keeps reporting the count from the other side of the
+  // breakpoint until the user happens to click a filter.
+  GALLERY_WIDE_MQ.addEventListener('change', () => apply(currentFilter));
+
+  // Initial paint, minus the announcement.
+  apply('all', { announce: false });
 })();
 
 
@@ -285,6 +346,9 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
        `nearest` so the page doesn't jump to the top of the
        section. Both respect the page's `scroll-behavior`,
        which is `auto` under prefers-reduced-motion.
+   G8: when there is nothing to reveal, the button itself is
+       hidden — not just its wrapper — so the filter's
+       `toggleUsable` check has something honest to read.
 --------------------------------------------------------- */
 (function initGalleryToggle() {
   const gallery = document.querySelector('[data-gallery]');
@@ -297,12 +361,16 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
   const collapsedLabel = 'Show ' + extraCount + ' more projects';
   const expandedLabel  = 'Show fewer projects';
 
-  // Nothing to reveal → the toggle would be a no-op, so keep it hidden.
+  // Nothing to reveal → the toggle would be a no-op. Hide the button
+  // itself as well as the wrapper so initGalleryFilter can tell the
+  // difference between "hidden by a filter" and "never existed".
   if (extraCount === 0) {
+    toggle.hidden = true;
     if (toggleWrap) toggleWrap.hidden = true;
     return;
   }
 
+  toggle.hidden = false;
   if (toggleWrap) toggleWrap.hidden = false;
   toggle.textContent = collapsedLabel;
 
@@ -310,6 +378,10 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     const expanded = gallery.classList.toggle('is-expanded');
     toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
     toggle.textContent = expanded ? expandedLabel : collapsedLabel;
+
+    // Let the filter recompute the live status — the set of rendered
+    // tiles just changed, so the previously announced count is stale.
+    gallery.dispatchEvent(new CustomEvent('gallery:toggled'));
 
     if (expanded) {
       const firstExtra = gallery.querySelector('li[data-extra]');
@@ -339,6 +411,14 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
      the last-viewed tile.
    - First-visit hint: one line under the caption, shown once
      per session, device-aware.
+
+   G6: the project list is filtered through the shared
+       isTileVisible(), so a collapsed mobile gallery gives
+       a 6-item viewer, not a 12-item one. Counter, arrow
+       keys, swipe and focus-return all agree with what is
+       on screen.
+   G7: crossing the 1000px breakpoint while the viewer is
+       open rebuilds the list and keeps the current image.
 --------------------------------------------------------- */
 (function initLightbox() {
   const lightbox  = document.querySelector('[data-lightbox]');
@@ -397,9 +477,12 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
   const isOpen   = () => lightbox.classList.contains('is-open');
   const isZoomed = () => lightbox.classList.contains('is-zoomed');
 
+  /* G6: the single source of truth for what the viewer may step
+     through. A tile hidden by the mobile limit — not just by a
+     filter — must not appear in the list. */
   function getVisibleProjects() {
     return Array.from(document.querySelectorAll('.project'))
-      .filter((btn) => !btn.closest('li.is-hidden'));
+      .filter((btn) => isTileVisible(btn.closest('li')));
   }
 
   /* --- Zoom ----------------------------------------------- */
@@ -608,6 +691,26 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
   imgEl.addEventListener('error', () => {
     lightbox.classList.remove('is-loading');
     if (captionEl) captionEl.textContent = 'Sorry, this image could not be loaded.';
+  });
+
+  /* --- G7: re-sync when the 1000px breakpoint flips --------
+     A tablet rotated to landscape mid-view suddenly has 12 tiles
+     instead of 6 (or the reverse). Rebuild the list and hold the
+     user's place. `load()` is skipped when the list length is
+     unchanged, so resizing within the same side of the breakpoint
+     doesn't reload the image. */
+  GALLERY_WIDE_MQ.addEventListener('change', () => {
+    if (!isOpen()) return;
+
+    const before  = projects.length;
+    const current = projects[index];
+    projects = getVisibleProjects();
+    if (!projects.length) return;
+
+    const found = projects.indexOf(current);
+    index = found >= 0 ? found : Math.min(index, projects.length - 1);
+
+    if (projects.length !== before) load(index);
   });
 })();
 
