@@ -5,19 +5,40 @@
    form interception, FAQ auto-close, back-to-top and
    scroll-reveal are the only JS-dependent behaviours.
 
-   CHANGELOG — audit fixes
-   - ADD §1.3: initJsClass now applies the .js hook that every
-     animation rule is gated behind (was previously only on
-     privacy.html, which meant the homepage never animated).
-   - FIX §1.4: data-wa templating is now actually wired up.
-   - FIX §3.3: lightbox toggles via is-open class only; no
-     more display:hidden flag, so the transition plays.
-   - FIX §4.2: form submission uses an anchor click instead of
-     window.open() to survive popup blockers.
-   - FIX §4.1: form has explicit validation, length caps,
-     live status region and screen-reader announcements.
-   - FIX §6: lightbox image now keeps its descriptive alt text;
-     background regions are made inert while it's open.
+   CHANGELOG
+   - initJsClass applies the .js hook that gates every
+     animation rule, with a 2.5s safety net.
+   - data-wa templating rewrites every WhatsApp href from a
+     single number + sign-off.
+   - Lightbox toggles via is-open only; no display flag, so
+     the transition plays.
+   - Form submission uses an anchor click, not window.open.
+   - Form has explicit validation, length caps, live status
+     region and screen-reader announcements.
+
+   CHANGELOG — gallery
+   - G1: live-status count reflects what is actually rendered
+     on mobile (was over-reporting on the limited view).
+   - G2: "show more" toggle is hidden while a filter is
+     active — it had nothing left to reveal.
+   - G3: toggle label and its initial hidden state are
+     derived from the real [data-extra] count.
+   - G4: expand centres the first new card; collapse uses
+     `nearest` so the page doesn't jump.
+   - G5: [data-limit] is the single source of truth for the
+     mobile cutoff; [data-extra] is re-derived at init.
+
+   CHANGELOG — lightbox
+   - L1: prev/next navigation (buttons, swipe, arrow keys),
+     live counter, and a loading spinner.
+   - L2: explicit zoom — button, double-click / double-tap,
+     native pinch, single-click to unzoom. Escape backs out
+     of zoom before it closes.
+   - L3: swipe-down closes, but is suppressed while zoomed
+     so vertical drags pan the image instead.
+   - L4: background regions inert while open; focus returns
+     to the last-viewed tile on close.
+   - L5: one-per-session hint line under the caption.
 ========================================================= */
 
 'use strict';
@@ -56,11 +77,11 @@ function trapFocus(container, e) {
 
 
 /* ---------------------------------------------------------
-   0a. JS-CLASS HOOK
+   1. JS-CLASS HOOK
    Sets html.js so the animation rules in style.css activate.
    The setTimeout is a safety net: if main.js fails to load
-   or throws before initReveal runs, the class is stripped and
-   every [data-reveal] element goes back to full opacity.
+   or throws before initReveal runs, the class is stripped
+   and every [data-reveal] element goes back to full opacity.
 --------------------------------------------------------- */
 (function initJsClass() {
   const root = document.documentElement;
@@ -76,7 +97,7 @@ function trapFocus(container, e) {
 
 
 /* ---------------------------------------------------------
-   0b. WHATSAPP TEMPLATE
+   2. WHATSAPP TEMPLATE
    Single source of truth for every WhatsApp link. Elements
    carry a `data-wa` attribute with the message body; the
    number, sign-off and URL encoding live here. Static hrefs
@@ -96,7 +117,7 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
 
 /* ---------------------------------------------------------
-   1. MOBILE NAVIGATION
+   3. MOBILE NAVIGATION
    Visibility is CSS-driven so links are removed from the
    tab order when the drawer is closed (WCAG 2.4.3).
 --------------------------------------------------------- */
@@ -150,7 +171,7 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
 
 /* ---------------------------------------------------------
-   2. STICKY HEADER SHADOW ON SCROLL
+   4. STICKY HEADER SHADOW ON SCROLL
 --------------------------------------------------------- */
 (function initHeaderShadow() {
   const header = document.querySelector('[data-header]');
@@ -162,12 +183,41 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
 
 /* ---------------------------------------------------------
-   3. FILTERABLE GALLERY
+   5. GALLERY MOBILE LIMIT
+   `data-limit` is the single source of truth for how many
+   projects show before the "show more" toggle appears. Items
+   past the limit get [data-extra], which the CSS hides below
+   1000px. The markup already ships [data-extra] applied so
+   mobile visitors never see a flash of all 12 cards before
+   this runs; the loop just keeps the two in sync.
+--------------------------------------------------------- */
+(function initGalleryLimit() {
+  const gallery = document.querySelector('[data-gallery][data-limit]');
+  if (!gallery) return;
+
+  const limit = parseInt(gallery.dataset.limit, 10);
+  if (!Number.isFinite(limit) || limit <= 0) return;
+
+  Array.from(gallery.children).forEach((item, i) => {
+    if (i >= limit) item.setAttribute('data-extra', '');
+    else item.removeAttribute('data-extra');
+  });
+})();
+
+
+/* ---------------------------------------------------------
+   6. FILTERABLE GALLERY
+   G1: the live-status count reflects what is actually
+       rendered on mobile (was over-reporting on the
+       limited view).
+   G2: the "show more" toggle is hidden while a filter is
+       active — it had nothing left to reveal.
 --------------------------------------------------------- */
 (function initGalleryFilter() {
-  const filtersEl = document.querySelector('[data-filters]');
-  const gallery   = document.querySelector('[data-gallery]');
-  const status    = document.querySelector('[data-gallery-status]');
+  const filtersEl  = document.querySelector('[data-filters]');
+  const gallery    = document.querySelector('[data-gallery]');
+  const status     = document.querySelector('[data-gallery-status]');
+  const toggleWrap = document.querySelector('.gallery-toggle-wrap');
   if (!filtersEl || !gallery) return;
 
   const buttons = Array.from(filtersEl.querySelectorAll('[data-filter]'));
@@ -185,25 +235,39 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
     if (badge) badge.textContent = counts[b.dataset.filter] || 0;
   });
 
+  // True only if the item is actually rendered right now.
+  function isRendered(el) {
+    if (el.classList.contains('is-hidden')) return false;
+    if (!el.hasAttribute('data-extra')) return true;
+    const wide     = window.matchMedia('(min-width: 1000px)').matches;
+    const expanded = gallery.classList.contains('is-expanded');
+    const filtered = gallery.classList.contains('is-filtered');
+    return wide || expanded || filtered;
+  }
+
   function apply(filter) {
-    let visible = 0;
     items.forEach((item) => {
       const btn = item.querySelector('.project');
       const cat = btn ? btn.dataset.cat : '';
-      const show = filter === 'all' || cat === filter;
-      item.classList.toggle('is-hidden', !show);
-      if (show) visible += 1;
+      item.classList.toggle('is-hidden', !(filter === 'all' || cat === filter));
     });
 
     gallery.classList.toggle('is-filtered', filter !== 'all');
+
+    // While a filter is active every match is already on screen, so the
+    // "show more" toggle has nothing left to reveal — hide it. It comes
+    // back the moment the user returns to "All Projects".
+    if (toggleWrap) toggleWrap.hidden = filter !== 'all';
 
     buttons.forEach((b) => {
       b.setAttribute('aria-pressed', b.dataset.filter === filter ? 'true' : 'false');
     });
 
     if (status) {
-      const label = filter === 'all' ? 'all projects' : filter + ' projects';
-      status.textContent = 'Showing ' + visible + ' ' + label + '.';
+      const visible = items.filter(isRendered).length;
+      status.textContent = filter === 'all'
+        ? 'Showing ' + visible + ' of ' + items.length + ' projects.'
+        : 'Showing ' + visible + ' ' + filter + ' projects.';
     }
   }
 
@@ -214,46 +278,97 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
 
 /* ---------------------------------------------------------
-   4. GALLERY "SHOW ALL" TOGGLE (mobile only)
+   7. GALLERY "SHOW MORE" TOGGLE (mobile only)
+   G3: the label and the wrap's hidden state are derived from
+       the real [data-extra] count.
+   G4: expanding centres the first new card; collapsing uses
+       `nearest` so the page doesn't jump to the top of the
+       section. Both respect the page's `scroll-behavior`,
+       which is `auto` under prefers-reduced-motion.
 --------------------------------------------------------- */
 (function initGalleryToggle() {
   const gallery = document.querySelector('[data-gallery]');
   const toggle  = document.querySelector('[data-gallery-toggle]');
   if (!gallery || !toggle) return;
 
+  const toggleWrap = toggle.closest('.gallery-toggle-wrap');
+
+  const extraCount     = gallery.querySelectorAll('li[data-extra]').length;
+  const collapsedLabel = 'Show ' + extraCount + ' more projects';
+  const expandedLabel  = 'Show fewer projects';
+
+  // Nothing to reveal → the toggle would be a no-op, so keep it hidden.
+  if (extraCount === 0) {
+    if (toggleWrap) toggleWrap.hidden = true;
+    return;
+  }
+
+  if (toggleWrap) toggleWrap.hidden = false;
+  toggle.textContent = collapsedLabel;
+
   toggle.addEventListener('click', () => {
     const expanded = gallery.classList.toggle('is-expanded');
     toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
-    toggle.textContent = expanded ? 'Show fewer projects' : 'Show all 12 projects';
+    toggle.textContent = expanded ? expandedLabel : collapsedLabel;
 
     if (expanded) {
       const firstExtra = gallery.querySelector('li[data-extra]');
-      if (firstExtra) firstExtra.scrollIntoView({ block: 'nearest' });
+      if (firstExtra) firstExtra.scrollIntoView({ block: 'center' });
     } else {
-      gallery.scrollIntoView({ block: 'start' });
+      gallery.scrollIntoView({ block: 'nearest' });
     }
   });
 })();
 
 
 /* ---------------------------------------------------------
-   5. LIGHTBOX
-   FIX (audit §3.3): state is driven purely by the `is-open`
-   class — the `hidden` attribute is not used, so the CSS
-   opacity/visibility transition can actually animate.
-   FIX (audit §6): the descriptive alt text from the thumbnail
-   is passed through, and background regions are made inert
-   while the dialog is open.
+   8. LIGHTBOX
+   Full flow: click → view → zoom → exit.
+
+   - Click: every .project tile is a <button>; a descriptive
+     aria-label is derived once at init.
+   - View: prev/next navigation (buttons, swipe, ←/→ keys),
+     a live "n / total" counter, and a loading spinner.
+     The navigation list is recomputed on open, so it respects
+     the active filter.
+   - Zoom: explicit button, double-click / double-tap, plus
+     native pinch. Single-click on a zoomed image zooms back
+     out. Escape unzooms before it closes.
+   - Exit: close button, click-backdrop, Escape, swipe-down.
+     Swipe-down is suppressed while zoomed. Focus returns to
+     the last-viewed tile.
+   - First-visit hint: one line under the caption, shown once
+     per session, device-aware.
 --------------------------------------------------------- */
 (function initLightbox() {
   const lightbox  = document.querySelector('[data-lightbox]');
+  const stage     = document.querySelector('[data-lightbox-stage]');
   const imgEl     = document.querySelector('[data-lightbox-img]');
   const captionEl = document.querySelector('[data-lightbox-caption]');
+  const counterEl = document.querySelector('[data-lightbox-counter]');
   const closeBtn  = document.querySelector('[data-lightbox-close]');
-  if (!lightbox || !imgEl || !closeBtn) return;
+  const prevBtn   = document.querySelector('[data-lightbox-prev]');
+  const nextBtn   = document.querySelector('[data-lightbox-next]');
+  const zoomBtn   = document.querySelector('[data-lightbox-zoom]');
+  const hintEl    = document.querySelector('[data-lightbox-hint]');
+  if (!lightbox || !stage || !imgEl || !closeBtn) return;
 
-  // Regions we hide from assistive tech (and, where supported, from focus)
-  // while the dialog is open.
+  const HINT_KEY = 'jasho-lb-hint-seen';
+
+  /* --- Give every tile a proper accessible name ----------- */
+  document.querySelectorAll('.project').forEach((btn) => {
+    if (btn.hasAttribute('aria-label')) return;
+    const title = btn.querySelector('.project__title');
+    const loc   = btn.querySelector('.project__loc');
+    btn.setAttribute(
+      'aria-label',
+      'View project: ' +
+        (title ? title.textContent.trim() : '') +
+        (loc ? ', ' + loc.textContent.trim() : '')
+    );
+  });
+
+  /* --- Background regions made inert while open ----------- */
   const backgroundRegions = [
     document.querySelector('.site-header'),
     document.querySelector('main'),
@@ -264,90 +379,245 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
   function setBackgroundInert(on) {
     backgroundRegions.forEach((el) => {
-      if (on) {
-        el.setAttribute('inert', '');
-        el.setAttribute('aria-hidden', 'true');
-      } else {
-        el.removeAttribute('inert');
-        el.removeAttribute('aria-hidden');
-      }
+      if (on) { el.setAttribute('inert', ''); el.setAttribute('aria-hidden', 'true'); }
+      else    { el.removeAttribute('inert'); el.removeAttribute('aria-hidden'); }
     });
   }
 
-  let lastFocused = null;
+  /* --- State ---------------------------------------------- */
+  let projects    = [];   // visible .project buttons, in DOM order
+  let index       = 0;    // which one is on screen
+  let lastFocused = null; // element to restore focus to on close
+  let touchStartX = 0;
   let touchStartY = 0;
+  let lastSwipeAt = 0;
+  let lastTapAt   = 0;
+  let hintTimer   = null;
 
-  function isOpen() {
-    return lightbox.classList.contains('is-open');
+  const isOpen   = () => lightbox.classList.contains('is-open');
+  const isZoomed = () => lightbox.classList.contains('is-zoomed');
+
+  function getVisibleProjects() {
+    return Array.from(document.querySelectorAll('.project'))
+      .filter((btn) => !btn.closest('li.is-hidden'));
   }
 
-  function open(src, caption, alt) {
-    lastFocused = document.activeElement;
-    imgEl.src = src;
+  /* --- Zoom ----------------------------------------------- */
+  function setZoom(on) {
+    lightbox.classList.toggle('is-zoomed', on);
+    if (zoomBtn) {
+      zoomBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
+      zoomBtn.setAttribute('aria-label', on ? 'Zoom out' : 'Zoom in');
+    }
+    if (!on) stage.scrollTo(0, 0);
+  }
+
+  /* --- Load an image into the viewer ---------------------- */
+  function load(i) {
+    const btn = projects[i];
+    if (!btn) return;
+
+    const thumb   = btn.querySelector('img');
+    const src     = btn.dataset.img || (thumb && thumb.currentSrc) || (thumb && thumb.src) || '';
+    const title   = btn.querySelector('.project__title');
+    const caption = btn.dataset.caption || (title ? title.textContent : '');
+    const alt     = thumb ? thumb.alt : caption;
+
+    setZoom(false);
+    lightbox.classList.add('is-loading');
     imgEl.alt = alt || caption || 'Project image';
+    imgEl.src = src;
     captionEl.textContent = caption || '';
+
+    if (counterEl) counterEl.textContent = (i + 1) + ' / ' + projects.length;
+    const many = projects.length > 1;
+    if (prevBtn) prevBtn.hidden = !many;
+    if (nextBtn) nextBtn.hidden = !many;
+  }
+
+  function navigate(delta) {
+    if (projects.length < 2) return;
+    index = (index + delta + projects.length) % projects.length;
+    load(index);
+  }
+
+  /* --- First-visit hint ----------------------------------- */
+  function hintText() {
+    const fine = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    return fine
+      ? 'Double-click to zoom · Arrow keys to browse'
+      : 'Pinch or double-tap to zoom · Swipe to browse';
+  }
+
+  function hideHint() {
+    if (!hintEl) return;
+    hintEl.classList.remove('is-visible');
+    window.clearTimeout(hintTimer);
+    hintTimer = null;
+    window.setTimeout(() => {
+      if (!hintEl.classList.contains('is-visible')) hintEl.hidden = true;
+    }, 420);
+  }
+
+  function maybeShowHint() {
+    if (!hintEl) return;
+
+    let seen = false;
+    try { seen = sessionStorage.getItem(HINT_KEY) === '1'; } catch (_) {}
+    if (seen) return;
+
+    hintEl.textContent = hintText();
+    hintEl.hidden = false;
+    // Next frame so the opacity transition runs from 0 → 1.
+    requestAnimationFrame(() => hintEl.classList.add('is-visible'));
+
+    window.clearTimeout(hintTimer);
+    hintTimer = window.setTimeout(hideHint, 5000);
+
+    try { sessionStorage.setItem(HINT_KEY, '1'); } catch (_) {}
+  }
+
+  /* --- Open / close --------------------------------------- */
+  function open(btn) {
+    projects = getVisibleProjects();
+    index = Math.max(0, projects.indexOf(btn));
+
+    lastFocused = btn || document.activeElement;
     setBackgroundInert(true);
     lightbox.classList.add('is-open');
     document.body.style.overflow = 'hidden';
+    load(index);
     closeBtn.focus();
+    maybeShowHint();
   }
 
   function close() {
     lightbox.classList.remove('is-open');
+    setZoom(false);
     document.body.style.overflow = '';
     setBackgroundInert(false);
 
-    if (lastFocused && typeof lastFocused.focus === 'function') {
-      lastFocused.focus();
-      lastFocused = null;
+    const focusBack = projects[index] || lastFocused;
+    if (focusBack && typeof focusBack.focus === 'function') {
+      focusBack.focus({ preventScroll: true });
     }
+    lastFocused = null;
 
-    // Clear the src after the fade completes so a stale image isn't
-    // kept in memory, and so a screen reader on the page underneath
-    // doesn't encounter it if the user navigates back.
+    hideHint();
+
+    // Clear the src after the fade so a stale image isn't kept
+    // around, and so a screen reader on the page underneath
+    // doesn't run into it.
     window.setTimeout(() => {
-      if (!isOpen()) imgEl.removeAttribute('src');
+      if (!isOpen()) {
+        imgEl.removeAttribute('src');
+        lightbox.classList.remove('is-loading');
+      }
     }, 260);
   }
 
+  /* --- Wiring --------------------------------------------- */
   document.querySelectorAll('.project').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const img     = btn.querySelector('img');
-      const src     = btn.dataset.img || (img && img.src) || '';
-      const title   = btn.querySelector('.project__title');
-      const caption = btn.dataset.caption || (title ? title.textContent : '');
-      const alt     = img ? img.alt : caption;
-      if (src) open(src, caption, alt);
-    });
+    btn.addEventListener('click', () => open(btn));
   });
 
   closeBtn.addEventListener('click', close);
-  lightbox.addEventListener('click', (e) => { if (e.target === lightbox) close(); });
+  if (prevBtn) prevBtn.addEventListener('click', () => navigate(-1));
+  if (nextBtn) nextBtn.addEventListener('click', () => navigate(1));
+  if (zoomBtn) zoomBtn.addEventListener('click', () => setZoom(!isZoomed()));
 
+  /* Click on empty backdrop (or empty stage area) closes.
+     Ignored for 400ms after a swipe so the touchend-synthesised
+     click doesn't accidentally close the viewer. */
+  lightbox.addEventListener('click', (e) => {
+    if (Date.now() - lastSwipeAt < 400) return;
+    if (e.target === lightbox || e.target === stage) close();
+  });
+
+  /* Click on a zoomed image zooms out. */
+  imgEl.addEventListener('click', () => {
+    if (isZoomed()) setZoom(false);
+  });
+
+  /* Double-click on desktop zooms in. */
+  imgEl.addEventListener('dblclick', (e) => {
+    e.preventDefault();
+    setZoom(!isZoomed());
+  });
+
+  /* Double-tap on touch zooms in. Single tap on a zoomed image
+     zooms out (handled by the click listener above). */
+  imgEl.addEventListener('touchend', (e) => {
+    const now = Date.now();
+    if (now - lastTapAt < 300) {
+      e.preventDefault();
+      setZoom(!isZoomed());
+      lastTapAt = 0;
+    } else {
+      lastTapAt = now;
+    }
+  }, { passive: false });
+
+  /* --- Swipe gestures ------------------------------------- */
   lightbox.addEventListener('touchstart', (e) => {
-    touchStartY = e.changedTouches[0].clientY;
+    const t = e.changedTouches[0];
+    touchStartX = t.clientX;
+    touchStartY = t.clientY;
   }, { passive: true });
 
   lightbox.addEventListener('touchend', (e) => {
-    const deltaY = e.changedTouches[0].clientY - touchStartY;
-    if (deltaY > 90) close();
+    // While zoomed the image is the scroll target — let it pan.
+    if (isZoomed()) return;
+
+    const t  = e.changedTouches[0];
+    const dx = t.clientX - touchStartX;
+    const dy = t.clientY - touchStartY;
+    const ax = Math.abs(dx);
+    const ay = Math.abs(dy);
+
+    if (ax < 60 && ay < 60) return; // tap, not swipe
+
+    lastSwipeAt = Date.now();
+
+    if (ay > ax && dy > 90) { close(); return; }            // swipe down → close
+    if (ax > ay && ax > 60) { navigate(dx < 0 ? 1 : -1); }  // swipe L/R → nav
   }, { passive: true });
 
+  /* --- Keyboard ------------------------------------------- */
   document.addEventListener('keydown', (e) => {
     if (!isOpen()) return;
-    if (e.key === 'Escape') { close(); return; }
+
+    if (e.key === 'Escape') {
+      // First Escape backs out of zoom, a second closes.
+      if (isZoomed()) setZoom(false);
+      else close();
+      return;
+    }
+    if (e.key === 'ArrowRight') { navigate(1);  return; }
+    if (e.key === 'ArrowLeft')  { navigate(-1); return; }
+    if (e.key === '+' || e.key === '=') { setZoom(true);  return; }
+    if (e.key === '-')                  { setZoom(false); return; }
+
     trapFocus(lightbox, e);
+  });
+
+  /* --- Loading / error states ----------------------------- */
+  imgEl.addEventListener('load', () => {
+    lightbox.classList.remove('is-loading');
+  });
+  imgEl.addEventListener('error', () => {
+    lightbox.classList.remove('is-loading');
+    if (captionEl) captionEl.textContent = 'Sorry, this image could not be loaded.';
   });
 })();
 
 
 /* ---------------------------------------------------------
-   6. QUOTE FORM
-   FIX (audit §4.1 / §4.2 / §5):
+   9. QUOTE FORM
    - Trims, collapses whitespace and length-caps each field
      before composing the WhatsApp message.
    - Uses an anchor click rather than window.open() so popup
-     blockers and popup-blocker-hiding browsers don't eat it.
+     blockers don't eat it.
    - Reports validation errors and success in a live status
      region instead of silently doing nothing.
 --------------------------------------------------------- */
@@ -410,7 +680,7 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
 
 /* ---------------------------------------------------------
-   7. FAQ — CLOSE ANY OPEN ITEM WHEN CLICKING OUTSIDE
+   10. FAQ — CLOSE ANY OPEN ITEM WHEN CLICKING OUTSIDE
 --------------------------------------------------------- */
 (function initFaqOutsideClose() {
   const faqs = document.querySelectorAll('.faq');
@@ -427,7 +697,7 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
 
 /* ---------------------------------------------------------
-   8. BACK TO TOP — visible after a short scroll
+   11. BACK TO TOP — visible after a short scroll
 --------------------------------------------------------- */
 (function initBackToTop() {
   const btn = document.querySelector('[data-to-top]');
@@ -445,10 +715,10 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
 
 /* ---------------------------------------------------------
-   9. SCROLL REVEAL
+   12. SCROLL REVEAL
    Auto-applies [data-reveal] to key blocks. Staggers grid
    children. Uses `translate` (not `transform`) so component
-   hover transforms keep working. Respects prefers-reduced-motion.
+   hover transforms keep working. Respects reduced motion.
 --------------------------------------------------------- */
 (function initReveal() {
   // Mark ready before the early-return so the initJsClass safety
@@ -506,7 +776,7 @@ document.querySelectorAll('[data-wa]').forEach((el) => {
 
 
 /* ---------------------------------------------------------
-   10. FOOTER — CURRENT YEAR
+   13. FOOTER — CURRENT YEAR
 --------------------------------------------------------- */
 (function initFooterYear() {
   document.querySelectorAll('[data-year]').forEach((el) => {

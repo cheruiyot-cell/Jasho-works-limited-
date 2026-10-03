@@ -8,19 +8,33 @@
      5. Page sections (header, hero, footer, etc.)
      6. Utilities & motion preferences
 
-   CHANGELOG — audit fixes
-   - FIX §1.1: added .hero__bg / .hero__scrim — hero image now positions
-     absolutely with a readable gradient overlay
-   - FIX §1.2: removed the two-column .hero__inner grid; copy now capped
-     at 680px on desktop instead of taking half the row
+   CHANGELOG — audit + interaction fixes
+   - FIX §1.1: added .hero__bg / .hero__scrim
+   - FIX §1.2: removed the two-column .hero__inner grid
    - FIX §1.5: removed .gallery-toggle[aria-expanded="true"] { display: none }
-     so the "Show fewer projects" state is reachable
    - FIX §3.1: restored :focus-visible outline on form fields
-   - FIX §3.2: removed dead .hero__media and .btn--outline rules
-   - FIX §3.3: lightbox now animates via opacity/visibility (no 200 ms dead state)
+   - FIX §3.2: removed dead .hero__media / .btn--outline rules
+   - FIX §3.3: lightbox animates via opacity/visibility (no dead state)
    - FIX §3.5: wrapped backdrop-filter in @supports
    - ADD: .quote-form__status and .quote-form__noscript styles
    - ADD: .faq--spaced and .footer-bottom--flush (used by privacy.html)
+
+   CHANGELOG — gallery
+   - G1: [data-extra] hiding is scoped to mobile only; .is-filtered
+     override is now inside the same breakpoint, so desktop is unaffected
+   - G2: [data-limit] is now the single source of truth (main.js
+     re-derives [data-extra] from it at init)
+   - G3: .project uses cursor: zoom-in
+
+   CHANGELOG — lightbox
+   - L1: added prev/next, zoom, counter, spinner, stage
+   - L2: stage uses overflow: auto + image margin: auto (both edges
+     reachable when zoomed)
+   - L3: zoom state toggles .is-zoomed on the dialog; image becomes
+     200% width and scrolls
+   - L4: control buttons get :active feedback and safe-area insets
+   - L5: [hidden] on nav buttons must win — explicit display: none
+   - L6: added .lightbox__meta + .lightbox__hint for the first-visit tip
    ========================================================================= */
 
 
@@ -314,19 +328,31 @@ address { font-style: normal; }
 @media (min-width: 420px) { .gallery { grid-template-columns: repeat(2, 1fr); } }
 @media (min-width: 1000px){ .gallery { grid-template-columns: repeat(3, 1fr); } }
 
+/* Mobile: hide "extra" projects until the toggle (or a filter) reveals
+   them. `data-limit` is read by main.js and re-derives [data-extra] at
+   init; the attribute is also present in the markup so mobile visitors
+   never see a flash of all cards before the script runs. */
 .gallery[data-limit] > li[data-extra] { display: none; }
 .gallery.is-expanded > li[data-extra] { display: block; }
 
+/* Desktop: no limit — every project is always on screen. */
 @media (min-width: 1000px) {
   .gallery[data-limit] > li[data-extra] { display: block; }
 }
 
 .gallery > li.is-hidden { display: none !important; }
-.gallery.is-filtered > li[data-extra] { display: block; }
+
+/* Mobile only. While a filter is active the gallery shows every match,
+   so [data-extra] cards have to come back on screen. On desktop the
+   media query above already shows them, so scoping here keeps that
+   rule single-purpose. */
+@media (max-width: 999px) {
+  .gallery.is-filtered > li[data-extra] { display: block; }
+}
 
 .project {
   position: relative; border-radius: var(--radius-md); overflow: hidden;
-  background: var(--ink); cursor: pointer; aspect-ratio: 4 / 3;
+  background: var(--ink); cursor: zoom-in; aspect-ratio: 4 / 3;
   border: none; padding: 0; text-align: left; color: #fff;
   transition: transform .3s var(--ease); width: 100%;
 }
@@ -351,12 +377,8 @@ address { font-style: normal; }
 
 .gallery-toggle-wrap { margin-top: var(--space-xl); text-align: center; }
 @media (min-width: 1000px) { .gallery-toggle-wrap { display: none; } }
-/* NOTE (audit §1.5): the previous rule `.gallery-toggle[aria-expanded="true"]
-   { display: none; }` was removed — it made the collapse state unreachable. */
 
 /* ---------- Lightbox ---------- */
-/* FIX (audit §3.3): switched from display toggling to opacity/visibility so
-   the open/close transition actually plays. */
 .lightbox {
   position: fixed; inset: 0; z-index: 200;
   background: rgba(15,12,9,.94);
@@ -366,23 +388,150 @@ address { font-style: normal; }
   transition: opacity .2s var(--ease), visibility .2s var(--ease);
 }
 .lightbox.is-open { opacity: 1; visibility: visible; }
-.lightbox__img {
-  max-width: min(100%, 1100px); max-height: 85vh;
-  border-radius: var(--radius-md); box-shadow: var(--shadow-lg);
-  touch-action: pan-x pinch-zoom;
+
+/* Stage clips + scrolls the image. `margin: auto` on the child (rather
+   than place-items) so both edges stay reachable when the image
+   overflows while zoomed. */
+.lightbox__stage {
+  max-width: min(100%, 1100px);
+  max-height: 85vh;
+  max-height: min(85vh, calc(100dvh - 8rem));
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  display: grid;
+  border-radius: var(--radius-md);
 }
-.lightbox__close {
-  position: absolute; top: calc(1rem + env(safe-area-inset-top)); right: 1rem;
+
+.lightbox__img {
+  display: block;
+  margin: auto;
+  max-width: 100%;
+  max-height: 85vh;
+  max-height: min(85vh, calc(100dvh - 8rem));
+  width: auto; height: auto;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  cursor: zoom-in;
+  user-select: none;
+  -webkit-user-drag: none;
+  /* Not zoomed: horizontal swipe pans, and vertical drags fall through
+     to JS (swipe-down to close). Pinch-zoom always native. */
+  touch-action: pan-x pinch-zoom;
+  transition: border-radius .2s, box-shadow .2s;
+}
+
+/* Zoomed: the image is 2× the stage width and native scrolling does the
+   panning. All directions allowed; swipe-to-close is suppressed in JS
+   while .is-zoomed is on. */
+.lightbox.is-zoomed .lightbox__img {
+  max-width: none;
+  max-height: none;
+  width: 200%;
+  border-radius: 0;
+  box-shadow: none;
+  cursor: zoom-out;
+  touch-action: pan-x pan-y pinch-zoom;
+}
+
+/* ---- Controls ---- */
+.lightbox__close,
+.lightbox__nav,
+.lightbox__zoom {
+  position: absolute;
   width: 48px; height: 48px; border-radius: 50%;
   background: rgba(255,255,255,.14); color: #fff;
-  display: grid; place-items: center; border: 1px solid rgba(255,255,255,.2);
+  display: grid; place-items: center;
+  border: 1px solid rgba(255,255,255,.22);
+  transition: background .2s, transform .2s var(--ease);
+  z-index: 2;
 }
-.lightbox__close:hover { background: rgba(255,255,255,.24); }
+.lightbox__close:hover,
+.lightbox__nav:hover,
+.lightbox__zoom:hover { background: rgba(255,255,255,.26); }
+.lightbox__close:active,
+.lightbox__nav:active,
+.lightbox__zoom:active { transform: scale(.94); }
+
+.lightbox__close { top: calc(1rem + env(safe-area-inset-top)); right: 1rem; }
+.lightbox__zoom  { top: calc(1rem + env(safe-area-inset-top));
+                   right: calc(1rem + 48px + .5rem); }
+
+.lightbox__nav { top: 50%; translate: 0 -50%; }
+.lightbox__nav--prev { left: 1rem; }
+.lightbox__nav--next { right: 1rem; }
+/* [hidden] must win over `display: grid` above. */
+.lightbox__nav[hidden] { display: none; }
+
+.lightbox__zoom svg { width: 20px; height: 20px; grid-area: 1 / 1; }
+.lightbox__zoom .lightbox__zoom-out { display: none; }
+.lightbox__zoom[aria-pressed="true"] .lightbox__zoom-in  { display: none; }
+.lightbox__zoom[aria-pressed="true"] .lightbox__zoom-out { display: block; }
+
+@media (max-width: 560px) {
+  .lightbox__nav { width: 42px; height: 42px; }
+  .lightbox__nav--prev { left: .5rem; }
+  .lightbox__nav--next { right: .5rem; }
+}
+
+/* ---- Meta strip: hint + caption ---- */
+.lightbox__meta {
+  position: absolute;
+  bottom: calc(1rem + env(safe-area-inset-bottom));
+  left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: .45rem;
+  width: max-content; max-width: 90%;
+  pointer-events: none;
+  z-index: 2;
+}
+
 .lightbox__caption {
-  position: absolute; bottom: calc(1rem + env(safe-area-inset-bottom));
-  left: 50%; transform: translateX(-50%); color: #fff; text-align: center;
-  font-size: .9rem; background: rgba(0,0,0,.6);
-  padding: .5rem 1rem; border-radius: var(--radius-pill); max-width: 90%;
+  color: #fff; text-align: center; font-size: .9rem;
+  background: rgba(0,0,0,.6);
+  padding: .5rem 1rem; border-radius: var(--radius-pill);
+  max-width: 100%;
+}
+
+.lightbox__hint {
+  color: rgba(255,255,255,.92); text-align: center; font-size: .8125rem;
+  background: rgba(0,0,0,.5);
+  padding: .4rem .9rem; border-radius: var(--radius-pill);
+  max-width: 100%;
+  opacity: 0;
+  transition: opacity .4s var(--ease);
+}
+.lightbox__hint.is-visible { opacity: 1; }
+
+/* ---- Counter ---- */
+.lightbox__counter {
+  position: absolute;
+  top: calc(1rem + env(safe-area-inset-top));
+  left: 1rem;
+  color: #fff; font-size: .8125rem; font-weight: 700;
+  background: rgba(255,255,255,.14);
+  border: 1px solid rgba(255,255,255,.22);
+  padding: .5rem .85rem; border-radius: var(--radius-pill);
+  letter-spacing: .02em;
+  z-index: 2;
+}
+
+/* ---- Loading spinner ---- */
+.lightbox__spinner {
+  position: absolute; top: 50%; left: 50%;
+  width: 40px; height: 40px; margin: -20px 0 0 -20px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.2);
+  border-top-color: #fff;
+  animation: lbSpin .8s linear infinite;
+  opacity: 0; visibility: hidden;
+  transition: opacity .2s;
+  z-index: 2;
+}
+.lightbox.is-loading .lightbox__spinner { opacity: 1; visibility: visible; }
+@keyframes lbSpin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .lightbox__spinner { animation-duration: 1.6s; }
 }
 
 /* ---------- Process ---------- */
@@ -417,7 +566,6 @@ address { font-style: normal; }
 
 /* ---------- FAQ ---------- */
 .faq { display: flex; flex-direction: column; gap: .6rem; }
-/* Used on privacy.html to add breathing room below the page intro. */
 .faq--spaced { margin-top: 2rem; }
 .faq details { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; }
 .faq summary {
@@ -466,9 +614,6 @@ address { font-style: normal; }
 }
 .field input::placeholder { color: rgba(255,255,255,.45); }
 
-/* FIX (audit §3.1): removed bare `outline: none` so keyboard users keep a
-   visible focus indicator. Mouse-click focus is suppressed via :focus-visible
-   instead, which preserves the design intent without harming a11y. */
 .field input:focus,
 .field select:focus {
   border-color: var(--accent);
@@ -480,7 +625,6 @@ address { font-style: normal; }
   outline: 3px solid var(--accent);
   outline-offset: 2px;
 }
-/* Browsers without :focus-visible get the outline on plain :focus too. */
 @supports not selector(:focus-visible) {
   .field input:focus,
   .field select:focus {
@@ -498,7 +642,6 @@ address { font-style: normal; }
 .field select option { color: #16130f; background: #fff; }
 .quote-form__note { font-size: .8125rem; color: rgba(255,255,255,.65); text-align: center; }
 
-/* ADD (audit §4.1): visible form status + noscript fallback */
 .quote-form__status {
   font-size: .875rem; font-weight: 600;
   color: rgba(255,255,255,.85);
@@ -531,8 +674,6 @@ address { font-style: normal; }
   border-bottom: 1px solid transparent;
   transition: border-color .3s, box-shadow .3s;
 }
-/* FIX (audit §3.5): only apply backdrop-filter when the browser supports it,
-   so devices that render it slowly fall back to the opaque background. */
 @media (min-width: 900px) {
   @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .site-header {
@@ -598,7 +739,6 @@ address { font-style: normal; }
   .nav__cta { margin-top: 0; padding: .65rem 1.15rem; font-size: .875rem; min-height: auto; }
 }
 
-/* Nav-link underline micro-interaction (desktop only, motion allowed) */
 @media (min-width: 900px) and (prefers-reduced-motion: no-preference) {
   .nav__list a { position: relative; }
   .nav__list a::after {
@@ -611,15 +751,12 @@ address { font-style: normal; }
 }
 
 /* ---------- Hero ---------- */
-/* FIX (audit §1.1 / §1.2): the hero is now a positioning context for the
-   full-bleed background image, and the copy is capped rather than squeezed
-   into a two-column grid that only had one child. */
 .hero {
   position: relative;
   isolation: isolate;
   padding-block: clamp(3rem, 7vw, 6rem);
   overflow: hidden;
-  background: var(--surface); /* pre-image fallback while the bg loads */
+  background: var(--surface);
 }
 
 .hero__bg {
@@ -629,9 +766,6 @@ address { font-style: normal; }
   object-position: center 40%;
 }
 
-/* Readability scrim. On narrow screens the copy occupies the full width,
-   so we darken top-to-bottom. On desktop the copy sits on the left, so the
-   gradient runs left-to-right and lets the image breathe on the right. */
 .hero__scrim {
   position: absolute; inset: 0; z-index: 1;
   background: linear-gradient(
@@ -695,8 +829,6 @@ address { font-style: normal; }
   .trust-strip { flex-direction: row; flex-wrap: wrap; gap: 1.5rem; }
 }
 
-/* Hero entrance — staggered fade + rise. Uses `translate` (not `transform`)
-   so button hover transforms never conflict with the entrance animation. */
 @media (prefers-reduced-motion: no-preference) {
   .js .hero__copy > * {
     opacity: 0;
@@ -789,8 +921,6 @@ address { font-style: normal; }
 @media (min-width: 700px) {
   .footer-bottom { flex-direction: row; justify-content: space-between; align-items: center; }
 }
-/* Used by privacy.html to remove the double border when the footer sits
-   directly under the page content. */
 .footer-bottom--flush { margin-top: 0; border-top: none; padding-top: 0; }
 
 /* ---------- Sticky WhatsApp (mobile, bottom-right) ---------- */

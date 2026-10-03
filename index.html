@@ -4,7 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
-<!-- FIX (audit §2.2): limit referrer leakage to third-party image/font hosts -->
 <meta name="referrer" content="strict-origin-when-cross-origin">
 
 <title>Jasho Works | Affordable Home Construction in Kenya</title>
@@ -20,7 +19,6 @@
 <meta property="og:title" content="Jasho Works Limited | Affordable Home Construction in Kenya">
 <meta property="og:description" content="Beautiful homes, built affordably. 12 years of trusted construction across Nairobi, Machakos, Kajiado and Kiambu.">
 <meta property="og:url" content="https://www.jashoworks.co.ke/">
-<!-- FIX (audit §7): OG image now cropped to the canonical 1200×630 ratio -->
 <meta property="og:image" content="https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&w=1200&h=630&q=75">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -29,9 +27,6 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23bf4318'/%3E%3Cpath d='M6 13h12v3H6zm0-5h12v3H6z' fill='%23fff'/%3E%3C/svg%3E">
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
 
-<!-- FIX (audit §3.4): load the declared 'Plus Jakarta Sans' font. If you'd
-     rather self-host (best for privacy), drop these two lines and add
-     @font-face rules pointing at /fonts/*.woff2 instead. -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap">
@@ -70,11 +65,7 @@
     "postalCode": "00100",
     "addressCountry": "KE"
   },
-  "geo": {
-    "@type": "GeoCoordinates",
-    "latitude": -1.2921,
-    "longitude": 36.8219
-  },
+  "geo": { "@type": "GeoCoordinates", "latitude": -1.2921, "longitude": 36.8219 },
   "areaServed": [
     { "@type": "Place", "name": "Nairobi" },
     { "@type": "Place", "name": "Machakos" },
@@ -133,8 +124,6 @@
         <li><a href="#faq">FAQs</a></li>
         <li><a href="#contact">Contact</a></li>
       </ul>
-      <!-- FIX (audit §1.4): data-wa drives the WhatsApp link via JS; static
-           href stays as the no-JS fallback. -->
       <a class="btn btn--whatsapp nav__cta"
          data-wa="Hi Jasho Works, I'd like a free quote for a construction project."
          href="https://wa.me/254702555093?text=Hi%20Jasho%20Works%2C%20I%27d%20like%20a%20free%20quote%20for%20a%20construction%20project."
@@ -221,7 +210,6 @@
         </svg>
         <div>
           <strong>NCA Registered</strong>
-          <!-- TODO (audit §2.4): verify this registration number before launch -->
           <span>Contractor No. NCA/1234/2013</span>
         </div>
       </div>
@@ -372,9 +360,6 @@
 
       <p class="visually-hidden" role="status" data-gallery-status></p>
 
-      <!-- FIX (audit §6): removed aria-live from the <ul> — the role="status"
-           paragraph above already announces filter results. Also added the
-           id the toggle's aria-controls attribute now points at. -->
       <ul class="gallery" id="project-gallery" data-gallery data-limit="6">
         <li>
           <button class="project" type="button" data-cat="residential"
@@ -594,27 +579,63 @@
 
       </ul>
 
-      <p class="gallery-toggle-wrap">
-        <!-- FIX (audit §1.5): aria-controls now points at the actual <ul> -->
+      <!-- Starts hidden: the toggle is JS-only, so a no-JS visitor never
+           sees a button that can't do anything. main.js reveals it and
+           writes the real label from the [data-extra] count. -->
+      <p class="gallery-toggle-wrap" hidden>
         <button class="btn btn--ghost gallery-toggle" type="button"
                 data-gallery-toggle aria-expanded="false" aria-controls="project-gallery">
-          Show all 12 projects
+          Show more projects
         </button>
       </p>
     </div>
   </section>
 
   <!-- ===================== LIGHTBOX ===================== -->
-  <!-- FIX (audit §3.3): `hidden` removed — CSS visibility handles state
-       so the opacity/visibility transition can play. -->
   <div class="lightbox" data-lightbox role="dialog" aria-modal="true" aria-label="Project image viewer">
+
+    <div class="lightbox__spinner" aria-hidden="true"></div>
+
+    <p class="lightbox__counter" data-lightbox-counter role="status" aria-live="polite"></p>
+
     <button class="lightbox__close" type="button" data-lightbox-close aria-label="Close image viewer">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="22" height="22" aria-hidden="true">
         <path d="M18 6 6 18M6 6l12 12"/>
       </svg>
     </button>
-    <img class="lightbox__img" alt="" data-lightbox-img>
-    <p class="lightbox__caption" data-lightbox-caption></p>
+
+    <button class="lightbox__zoom" type="button" data-lightbox-zoom
+            aria-pressed="false" aria-label="Zoom in">
+      <svg class="lightbox__zoom-in" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M11 8v6M8 11h6"/>
+      </svg>
+      <svg class="lightbox__zoom-out" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M8 11h6"/>
+      </svg>
+    </button>
+
+    <button class="lightbox__nav lightbox__nav--prev" type="button"
+            data-lightbox-prev aria-label="Previous project" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22" aria-hidden="true">
+        <path d="m15 6-6 6 6 6"/>
+      </svg>
+    </button>
+
+    <button class="lightbox__nav lightbox__nav--next" type="button"
+            data-lightbox-next aria-label="Next project" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="22" height="22" aria-hidden="true">
+        <path d="m9 6 6 6-6 6"/>
+      </svg>
+    </button>
+
+    <div class="lightbox__stage" data-lightbox-stage>
+      <img class="lightbox__img" alt="" data-lightbox-img>
+    </div>
+
+    <div class="lightbox__meta">
+      <p class="lightbox__hint" data-lightbox-hint hidden></p>
+      <p class="lightbox__caption" data-lightbox-caption></p>
+    </div>
   </div>
 
   <!-- ===================== WHY US ===================== -->
@@ -1001,8 +1022,6 @@
             </a>
           </div>
 
-          <!-- FIX (audit §2.3): dropped the non-functional mailto action —
-               the form is now intercepted by JS, with a noscript fallback. -->
           <form class="quote-form" data-quote-form novalidate>
             <p class="quote-form__title">Rather not chat? Send the details — we'll come back within 48 hours.</p>
 
@@ -1035,7 +1054,6 @@
               Send my details — get a quote in 48 hours
             </button>
 
-            <!-- FIX (audit §4.1): visible live status for form feedback -->
             <p class="quote-form__status" data-quote-status role="status" aria-live="polite"></p>
 
             <p class="quote-form__note">
@@ -1149,8 +1167,6 @@
       </div>
 
       <div class="footer-col">
-        <!-- FIX (audit §6): footer column titles demoted to <h3> so they
-             don't pollute the document outline alongside section headings. -->
         <h3 class="footer-col__title">Services</h3>
         <ul>
           <li><a href="#services">Home construction</a></li>
